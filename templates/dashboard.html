@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛸 Antigravity Dashboard <span class="version-tag"></span></title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0d14;
+            --surface: #10141f;
+            --surface2: #161b2e;
+            --border: #1e2540;
+            --accent: #4f8ef7;
+            --accent2: #7c3aed;
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --text: #e2e8f0;
+            --text-muted: #64748b;
+            --font: 'Inter', sans-serif;
+            --mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        /* HEADER */
+        header {
+            background: linear-gradient(135deg, var(--surface2) 0%, #0d1426 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            font-size: 1.8rem;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-5px);
+            }
+        }
+
+        .logo-text h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-text span {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: var(--mono);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .last-updated {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-family: var(--mono);
+        }
+
+        /* STATUS PILL */
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.9rem;
+            border-radius: 2rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            border: 1px solid;
+        }
+
+        .status-pill.online {
+            background: rgba(16, 185, 129, 0.12);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: var(--green);
+        }
+
+        .status-pill.offline {
+            background: rgba(239, 68, 68, 0.12);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--red);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .dot.pulse {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.4;
+                transform: scale(0.8);
+            }
+        }
+
+        /* ACTION BUTTONS */
+        .btn {
+            padding: 0.45rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-family: var(--font);
+            transition: all 0.2s;
+        }
+
+        .btn-start {
+            background: rgba(16, 185, 129, 0.12);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: var(--green);
+        }
+
+        .btn-start:hover {
+            background: rgba(16, 185, 129, 0.25);
+        }
+
+        .btn-stop {
+            background: rgba(239, 68, 68, 0.12);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--red);
+        }
+
+        .btn-stop:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+
+        /* GRID LAYOUT */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            padding: 1.5rem 2rem;
+        }
+
+        .grid-wide {
+            grid-column: span 2;
+        }
+
+        .grid-full {
+            grid-column: span 4;
+        }
+
+        /* CARDS */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            transition: transform 0.2s, border-color 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card:hover {
+            border-color: rgba(79, 142, 247, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 0.9rem;
+        }
+
+        .card-icon {
+            font-size: 1rem;
+        }
+
+        /* METRIC CARDS */
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: var(--mono);
+            line-height: 1;
+        }
+
+        .metric-sub {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.4rem;
+        }
+
+        /* NEXUS CARD */
+        .nexus-score {
+            font-size: 3.5rem;
+            font-weight: 700;
+            font-family: var(--mono);
+            line-height: 1;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nexus-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            margin: 0.75rem 0;
+            overflow: hidden;
+        }
+
+        .nexus-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981);
+            transition: width 0.8s cubic-bezier(.4, 0, .2, 1);
+        }
+
+        .nexus-bias {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 2rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .bias-bullish {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
+        }
+
+        .bias-bearish {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--red);
+        }
+
+        .bias-neutral {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--yellow);
+        }
+
+        .nexus-comment {
+            font-size: 0.77rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            border-top: 1px solid var(--border);
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+        }
+
+        /* NEXUS SOURCES BREAKDOWN */
+        .nexus-sources {
+            margin-top: 1rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        /* POSITIONS TABLE */
+        .positions-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            gap: 0.5rem;
+        }
+
+        .positions-empty span {
+            font-size: 2rem;
+        }
+
+        .pos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .pos-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1rem;
+        }
+
+        .pos-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+
+        .pos-symbol {
+            font-weight: 700;
+            font-size: 1rem;
+            font-family: var(--mono);
+        }
+
+        .pos-side {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 0.35rem;
+        }
+
+        .pos-side.long {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--green);
+        }
+
+        .pos-side.short {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--red);
+        }
+
+        .pos-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            padding: 0.3rem 0;
+            border-bottom: 1px solid rgba(30, 37, 64, 0.5);
+        }
+
+        .pos-row:last-child {
+            border-bottom: none;
+        }
+
+        .pos-label {
+            color: var(--text-muted);
+        }
+
+        .pos-pnl.green {
+            color: var(--green);
+            font-weight: 600;
+        }
+
+        .pos-pnl.red {
+            color: var(--red);
+            font-weight: 600;
+        }
+
+        /* LOG BOX */
+        .log-box {
+            background: #060810;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            height: 250px;
+            overflow-y: auto;
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            line-height: 1.6;
+            color: #7dd3fc;
+        }
+
+        .log-box::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .log-box::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .log-box::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        .log-line {
+            display: block;
+        }
+
+        .log-line.error {
+            color: #fca5a5;
+        }
+
+        .log-line.success {
+            color: #6ee7b7;
+        }
+
+        .log-line.warn {
+            color: #fcd34d;
+        }
+
+        /* TRADES TABLE */
+        .trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+        }
+
+        .trades-table th {
+            text-align: left;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .trades-table td {
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid rgba(30, 37, 64, 0.5);
+            font-family: var(--mono);
+        }
+
+        .trades-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .trades-table tr:hover td {
+            background: rgba(79, 142, 247, 0.04);
+        }
+
+        .pnl-pos {
+            color: var(--green);
+        }
+
+        .pnl-neg {
+            color: var(--red);
+        }
+
+        /* FOOTER */
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            font-family: var(--mono);
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .grid-wide {
+                grid-column: span 2;
+            }
+
+            .grid-full {
+                grid-column: span 2;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .grid {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+
+            .grid-wide,
+            .grid-full {
+                grid-column: span 1;
+            }
+
+            header {
+                padding: 0.75rem 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">
+            <span class="logo-icon">🛸</span>
+            <div class="logo-text">
+                <h1>Antigravity Dashboard</h1>
+                <span id="header-version">Loading...</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="last-updated" id="last-updated">Loading...</span>
+            <div id="engine-status" class="status-pill offline">
+                <div class="dot"></div>
+                <span>Offline</span>
+            </div>
+            <button class="btn btn-start" onclick="botAction('start')">▶ Start</button>
+            <button class="btn btn-stop" onclick="botAction('stop')">⏹ Stop</button>
+        </div>
+    </header>
+
+    <div class="grid">
+
+        <div class="card grid-wide">
+            <div class="card-header"><span class="card-icon">🧠</span> Nexus Intelligence</div>
+            <div style="display:flex; gap:2rem; align-items:flex-start;">
+                <div>
+                    <div class="nexus-score" id="nexus-score">--</div>
+                    <div class="metric-sub">/ 10.0</div>
+                </div>
+                <div style="flex:1">
+                    <div id="nexus-bias" class="nexus-bias bias-neutral">NEUTRAL</div>
+                    <div class="nexus-bar">
+                        <div class="nexus-fill" id="nexus-fill" style="width:50%"></div>
+                    </div>
+                    <div class="nexus-comment" id="nexus-comment">Loading Nexus data...</div>
+                    <div id="nexus-sources" class="nexus-sources"></div>
+                    <div class="metric-sub" id="nexus-updated" style="margin-top:0.5rem"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><span class="card-icon">📊</span> Statistics</div>
+            <div class="metric-value" id="open-positions-count">--</div>
+            <div class="metric-sub">Open Positions</div>
+            <hr style="border-color:var(--border); margin: 0.75rem 0;">
+            <div class="metric-value" style="font-size:1.2rem; color:var(--accent)" id="total-balance">--</div>
+            <div class="metric-sub">Total Balance (USDT)</div>
+            <div class="metric-sub" id="available-balance" style="font-size:0.7rem; opacity:0.8">Available: --</div>
+            <hr style="border-color:var(--border); margin: 0.75rem 0;">
+            <div class="metric-value" style="font-size:1.2rem" id="total-pnl">--</div>
+            <div class="metric-sub">Unrealized PnL (USDT)</div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><span class="card-icon">⚠️</span> Onchain Risk</div>
+            <div class="metric-value" id="onchain-risk">--</div>
+            <div class="metric-sub" id="fgi-value" style="margin-top:0.75rem"></div>
+            <div class="metric-sub" id="nexus-last-update"></div>
+        </div>
+
+        <div class="card grid-full">
+            <div class="card-header"><span class="card-icon">🧠</span> Raw Intel Feed (Nexus Transparency)</div>
+            <div id="intel-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+                <div style="color: var(--text-muted); font-size: 0.8rem; padding: 1rem;">Waiting for source data...</div>
+            </div>
+        </div>
+
+        <div class="card grid-full">
+            <div class="card-header"><span class="card-icon">📈</span> Open Positions</div>
+            <div id="positions-container">
+                <div class="positions-empty"><span>💤</span>No active positions</div>
+            </div>
+        </div>
+
+        <div class="card grid-wide">
+            <div class="card-header"><span class="card-icon">📋</span> Recent Trades</div>
+            <div style="overflow-x:auto;">
+                <table class="trades-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Symbol</th>
+                            <th>Side</th>
+                            <th>PnL (USDT)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trades-body">
+                        <tr>
+                            <td colspan="4" style="color:var(--text-muted); text-align:center; padding:1.5rem;">
+                                Loading history...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card grid-wide">
+            <div class="card-header"><span class="card-icon">📟</span> Live Log (engine.log)</div>
+            <div class="log-box" id="log-box">Loading logs...</div>
+        </div>
+
+    </div>
+
+    <footer>
+        Antigravity AI Engine <span id="footer-version"></span> &mdash; Dashboard auto-refresh every 5 seconds &mdash; <span
+            id="footer-time"></span>
+    </footer>
+
+    <script>
+        function botAction(action) {
+            fetch('/api/bot-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action })
+            }).then(r => r.json()).then(d => {
+                console.log(d);
+                setTimeout(fetchAll, 2000);
+            });
+        }
+
+        function fetchAll() {
+            fetch('/api/status').then(r => r.json()).then(data => {
+                // Engine status
+                const statusEl = document.getElementById('engine-status');
+                if (data.engine_running) {
+                    statusEl.className = 'status-pill online';
+                    statusEl.innerHTML = '<div class="dot pulse"></div><span>Online</span>';
+                } else {
+                    statusEl.className = 'status-pill offline';
+                    statusEl.innerHTML = '<div class="dot"></div><span>Offline</span>';
+                }
+
+                // Versions
+                if (data.version_info) {
+                    document.querySelectorAll('.version-tag').forEach(el => el.innerText = data.version_info.version);
+                    const headerVer = document.getElementById('header-version');
+                    if (headerVer) headerVer.innerText = data.version_info.full;
+                    const footerVer = document.getElementById('footer-version');
+                    if (footerVer) footerVer.innerText = data.version_info.version;
+                    document.title = `🛸 Antigravity Dashboard ${data.version_info.version}`;
+                }
+
+                // --- NEXUS SCORE ---
+                const nx = data.nexus || {};
+                const score = parseFloat(nx.nexus_score || 0);
+                document.getElementById('nexus-score').textContent = isNaN(score) ? '--' : score.toFixed(1);
+                document.getElementById('nexus-fill').style.width = (isNaN(score) ? 50 : score * 10) + '%';
+
+                const biasEl = document.getElementById('nexus-bias');
+                const bias = (nx.macro_bias || 'NEUTRAL').toUpperCase();
+                biasEl.textContent = bias;
+                biasEl.className = 'nexus-bias ' + (bias === 'BULLISH' ? 'bias-bullish' : bias === 'BEARISH' ? 'bias-bearish' : 'bias-neutral');
+                document.getElementById('nexus-comment').textContent = nx.ai_comment || 'No AI comment available.';
+                document.getElementById('nexus-updated').textContent = 'Last update: ' + (nx.last_ai_update || 'N/A');
+                document.getElementById('onchain-risk').textContent = nx.onchain_risk || '--';
+
+                // --- SUB-SCORES BREAKDOWN ---
+                const sourcesContainer = document.getElementById('nexus-sources');
+                const subScores = nx.sub_scores || {};
+
+                if (Object.keys(subScores).length > 0) {
+                    sourcesContainer.style.display = 'grid';
+
+                    const labels = {
+                        'video_score': { name: '🎥 Video', color: '#a855f7' },
+                        'liquidation_score': { name: '🔥 Liquidations', color: '#f59e0b' },
+                        'macro_score': { name: '🌍 Macro', color: '#3b82f6' },
+                        'news_score': { name: '📰 News', color: '#10b981' }
+                    };
+
+                    sourcesContainer.innerHTML = Object.entries(subScores).map(([key, scoreValue]) => {
+                        if (!labels[key]) return '';
+                        const scoreVal = parseFloat(scoreValue || 0);
+                        const formatScore = isNaN(scoreVal) ? 0 : scoreVal.toFixed(1);
+                        const percent = (formatScore / 10) * 100;
+                        const conf = labels[key];
+
+                        return `<div style="background: var(--surface2); padding: 0.6rem; border-radius: 0.5rem; border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; font-family: var(--mono); margin-bottom: 0.4rem; color: var(--text-muted);">
+            <span>${conf.name}</span>
+            <span style="color: ${conf.color}">${formatScore}/10</span>
+          </div>
+          <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+            <div style="width: ${percent}%; height: 100%; background: ${conf.color}; border-radius: 3px; transition: width 0.5s ease;"></div>
+          </div>
+        </div>`;
+                    }).join('');
+                } else {
+                    sourcesContainer.style.display = 'block';
+                    sourcesContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; padding-top: 0.5rem;">Waiting for Nexus sub-scores...</div>';
+                }
+
+                // --- Balance & Stats ---
+                const bal = data.balance || {};
+                document.getElementById('total-balance').textContent = parseFloat(bal.wallet || 0).toFixed(2) + ' USDT';
+                document.getElementById('available-balance').textContent = 'Available: ' + parseFloat(bal.available || 0).toFixed(2) + ' USDT';
+
+                const positions = data.positions || [];
+                document.getElementById('open-positions-count').textContent = positions.length;
+                const totalPnl = positions.reduce((s, p) => s + parseFloat(p.unrealized_pnl || 0), 0);
+                const pnlEl = document.getElementById('total-pnl');
+                pnlEl.textContent = (totalPnl >= 0 ? '+' : '') + totalPnl.toFixed(2) + ' USDT';
+                pnlEl.style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+
+                const posContainer = document.getElementById('positions-container');
+                if (positions.length === 0) {
+                    posContainer.innerHTML = '<div class="positions-empty"><span>💤</span>No active positions</div>';
+                } else {
+                    posContainer.innerHTML = '<div class="pos-grid">' + positions.map(p => {
+                        const pnl = parseFloat(p.unrealized_pnl || 0);
+                        return `<div class="pos-card">
+          <div class="pos-header">
+            <span class="pos-symbol">${p.symbol}</span>
+            <span class="pos-side ${['BUY', 'LONG'].includes(p.side) ? 'long' : 'short'}">${['BUY', 'LONG'].includes(p.side) ? 'LONG' : 'SHORT'}</span>
+          </div>
+          <div class="pos-row"><span class="pos-label">Entry</span><span>${parseFloat(p.entry_price).toFixed(2)}</span></div>
+          <div class="pos-row"><span class="pos-label">Mark</span><span>${parseFloat(p.mark_price).toFixed(2)}</span></div>
+          <div class="pos-row"><span class="pos-label">SL</span><span class="pos-pnl red" style="font-weight:600">${p.sl ? parseFloat(p.sl).toFixed(2) : '--'}</span></div>
+          <div class="pos-row"><span class="pos-label">TPs</span><span style="color:var(--accent2); font-weight:600">${p.tps && p.tps.length > 0 ? p.tps.map(tp => parseFloat(tp).toFixed(2)).join(' | ') : '--'}</span></div>
+          <div class="pos-row"><span class="pos-label">Qty</span><span>${Math.abs(p.qty)}</span></div>
+          <div class="pos-row"><span class="pos-label">PnL</span><span class="pos-pnl ${pnl >= 0 ? 'green' : 'red'}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USDT</span></div>
+          <div class="pos-row"><span class="pos-label">Lev</span><span>${p.leverage}x</span></div>
+        </div>`;
+                    }).join('') + '</div>';
+                }
+
+                // --- Trades ---
+                const trades = data.recent_trades || [];
+                const tbody = document.getElementById('trades-body');
+                if (trades.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted); text-align:center; padding:1.5rem;">No trade history available.</td></tr>';
+                } else {
+                    tbody.innerHTML = trades.map(t => {
+                        const pnl = t.pnl;
+                        const pnlText = (pnl !== null) ? `${pnl >= 0 ? '+' : ''}${parseFloat(pnl).toFixed(2)}` : '--';
+                        const pnlClass = (pnl !== null) ? (pnl >= 0 ? 'pnl-pos' : 'pnl-neg') : '';
+                        return `<tr>
+          <td>${t.time}</td>
+          <td>${t.symbol}</td>
+          <td>${t.side}</td>
+          <td class="${pnlClass}">${pnlText}</td>
+        </tr>`;
+                    }).join('');
+                }
+
+                // --- Log ---
+                const logBox = document.getElementById('log-box');
+                const lines = (data.log_lines || []).map(l => {
+                    let cls = 'log-line';
+                    if (l.includes('ERROR')) cls += ' error';
+                    else if (l.includes('OK') || l.includes('Success')) cls += ' success';
+                    else if (l.includes('WARN') || l.includes('⚠️')) cls += ' warn';
+                    return `<span class="${cls}">${l}</span>`;
+                }).join('\n');
+                logBox.innerHTML = lines;
+                logBox.scrollTop = logBox.scrollHeight;
+
+                // --- Raw Intel Feed (Nexus Transparency) ---
+                const intelBox = document.getElementById('intel-container');
+                const intel = data.raw_intel;
+
+                if (intel) {
+                    let htmlContent = '';
+
+                    // Module 1: Video Analysis
+                    if (intel.video) {
+                        const v = intel.video;
+                        let sentimentColor = v.sentiment === 'bullish' ? 'var(--green)' : (v.sentiment === 'bearish' ? 'var(--red)' : 'var(--yellow)');
+                        htmlContent += `
+                        <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <strong style="color: #a855f7; font-size: 0.8rem;">🎥 Video Analysis (Telegram)</strong>
+                                <span style="font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: 1rem;">Certainty: ${v.certainty}/10</span>
+                            </div>
+                            <div style="font-size: 0.85rem; margin-bottom: 0.5rem;">Sentiment: <strong style="color: ${sentimentColor}; text-transform: uppercase;">${v.sentiment}</strong></div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">${v.analysis || 'No description'}</div>
+                            <div style="font-size: 0.75rem; font-family: var(--mono); color: #7dd3fc;">Key Levels: ${v.key_levels ? v.key_levels.map(l => l.level).join(', ') : 'None'}</div>
+                        </div>`;
+                    }
+
+                    // Module 2: Macro Report (Email)
+                    if (intel.email) {
+                        const e = intel.email;
+                        htmlContent += `
+                        <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <strong style="color: #3b82f6; font-size: 0.8rem;">📧 Macro Report (Email)</strong>
+                                <span style="font-size: 0.7rem; color: var(--text-muted);">${e.source || ''}</span>
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">${e.content || 'No content'}</div>
+                            <div style="font-size: 0.7rem; color: #7dd3fc; font-family: var(--mono);">Update: ${e.last_update ? new Date(e.last_update).toLocaleString() : 'Unknown'}</div>
+                        </div>`;
+                    }
+
+                    // Module 3: Telegram Signals (Alpha Scraper)
+                    if (intel.telegram && intel.telegram.signals) {
+                        const tg = intel.telegram;
+                        htmlContent += `
+                        <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <strong style="color: #0ea5e9; font-size: 0.8rem;">💬 Telegram Scraper</strong>
+                                <span style="font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: 1rem;">Active Signals: ${tg.signals.length}</span>
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">
+                                Recent detected tickers:
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text);">
+                                ${tg.signals.slice(0, 4).map(s => `• <strong>${s.symbol}</strong>: ${s.action} (Detected: ${s.time})`).join('<br>')}
+                            </div>
+                        </div>`;
+                    }
+
+                    // Module 4: RSS & Social Sentiment
+                    if (intel.rss) {
+                        const rss = intel.rss;
+                        htmlContent += `
+                        <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <strong style="color: #f97316; font-size: 0.8rem;">📰 Social Sentiment & RSS</strong>
+                                <span style="font-size: 0.7rem; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: 1rem;">Update: ${rss.time || 'None'}</span>
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">
+                                Recent headlines / liquidation data:
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text);">
+                                ${(rss.news || []).slice(0, 3).map(n => `> ${n}`).join('<br>')}
+                            </div>
+                        </div>`;
+                    }
+
+                    // Module 5: Technical Analysis (Binance source)
+                    if (intel.ta) {
+                        const ta = intel.ta;
+                        htmlContent += `
+                        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid var(--green); border-radius: 0.5rem; padding: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <strong style="color: var(--green); font-size: 0.8rem;">📈 Binance Indicators (TA)</strong>
+                                <span style="font-size: 0.75rem; font-weight: bold; color: ${ta.trend === 'BULLISH' ? 'var(--green)' : 'var(--red)'};">${ta.trend || 'NEUTRAL'}</span>
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">
+                                Regime: <strong>${ta.regime || '--'}</strong>
+                            </div>
+                            <div style="font-size: 0.75rem; font-family: var(--mono); color: #7dd3fc; display: grid; grid-template-columns: 1fr; gap: 0.4rem;">
+                                <span>RSI: ${ta.rsi || '--'}</span>
+                                <span>EMA: ${ta.ema || '--'}</span>
+                                <span>ADX (Trend Strength): <strong>${ta.adx || '--'}</strong></span>
+                                <span>ATR (Volatility): <strong>${ta.atr || '--'}</strong></span>
+                            </div>
+                        </div>`;
+                    }
+
+                    if (htmlContent !== '') {
+                        intelBox.innerHTML = htmlContent;
+                    } else {
+                        intelBox.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem; padding: 1rem;">No raw data available (JSON files empty or missing).</div>';
+                    }
+                }
+
+                // --- Timestamp ---
+                const now = new Date().toLocaleTimeString();
+                document.getElementById('last-updated').textContent = 'Refreshed: ' + now;
+                document.getElementById('footer-time').textContent = new Date().toLocaleString();
+            }).catch(err => {
+                console.error('Fetch error:', err);
+            });
+        }
+
+        fetchAll();
+        setInterval(fetchAll, 5000);
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env
+
+# API Keys and Credentials
+.env
+credentials.json
+token.json
+*.session
+*.session-journal
+
+# Database and Cache
+bot_memory.db
+*.db
+redis/
+
+# Application state and logs
+autonomic_learning.json
+macro_intel.json
+tg_signals.json
+video_intel.json
+video_last_id.txt
+engine.log
+*.log
+
+# Temp directories
+/tmp/
+scratch/
