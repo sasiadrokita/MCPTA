@@ -15,6 +15,7 @@ credentials.json
 token.json
 *.session
 *.session-journal
+gcp-backup-key.json
 
 # Database and Cache
 bot_memory.db

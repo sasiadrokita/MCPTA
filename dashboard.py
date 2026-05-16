@@ -160,6 +160,41 @@ def get_recent_trades(n=15):
         print(f"[DASH] get_recent_trades error (Exchange): {e}")
         return []
 
+def get_pnl_summary():
+    """Calculates realized Daily and Monthly PnL from Bybit closed positions."""
+    try:
+        import datetime
+        now = datetime.datetime.utcnow()
+        # Fetch last 200 closed trades for monthly coverage
+        res = bybit.exchange.private_get_v5_position_closed_pnl({'category': 'linear', 'limit': 200})
+        if res.get('retCode') != '0':
+            return {'daily': 0.0, 'monthly': 0.0}
+
+        trades_list = res.get('result', {}).get('list', [])
+        daily_pnl = 0.0
+        monthly_pnl = 0.0
+
+        today = now.date()
+        this_month = (now.year, now.month)
+
+        for t in trades_list:
+            ts = int(t.get('updatedTime', 0)) / 1000
+            trade_dt = datetime.datetime.utcfromtimestamp(ts)
+            pnl = float(t.get('closedPnl', 0))
+
+            if trade_dt.date() == today:
+                daily_pnl += pnl
+            if (trade_dt.year, trade_dt.month) == this_month:
+                monthly_pnl += pnl
+
+        return {
+            'daily': round(daily_pnl, 4),
+            'monthly': round(monthly_pnl, 4)
+        }
+    except Exception as e:
+        print(f"[DASH] get_pnl_summary error: {e}")
+        return {'daily': 0.0, 'monthly': 0.0}
+
 def get_log_lines(n=30):
     """Reads the last n lines from engine.log."""
     log_path = os.path.join(BASE_DIR, 'engine.log')
@@ -186,6 +221,7 @@ def api_status():
     logs = get_log_lines()
     balance = get_balance()
     raw_intel = get_raw_intel()
+    pnl_summary = get_pnl_summary()
 
     # Compute total unrealized PnL
     total_pnl = sum(float(p.get('unrealized_pnl', 0)) for p in positions)
@@ -199,6 +235,7 @@ def api_status():
         'recent_trades': trades,
         'log_lines': logs,
         'raw_intel': raw_intel,
+        'pnl_summary': pnl_summary,
         'version_info': {
             'version': version.VERSION,
             'codename': version.CODENAME,

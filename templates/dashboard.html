@@ -598,10 +598,18 @@
         </div>
 
         <div class="card">
-            <div class="card-header"><span class="card-icon">⚠️</span> Onchain Risk</div>
-            <div class="metric-value" id="onchain-risk">--</div>
-            <div class="metric-sub" id="fgi-value" style="margin-top:0.75rem"></div>
-            <div class="metric-sub" id="nexus-last-update"></div>
+            <div class="card-header"><span class="card-icon">💹</span> Performance</div>
+            <div style="display:flex; flex-direction:column; gap:0.85rem;">
+                <div>
+                    <div class="metric-sub" style="margin-bottom:0.3rem">Today's Realized PnL</div>
+                    <div class="metric-value" id="daily-pnl" style="font-size:1.5rem">--</div>
+                </div>
+                <hr style="border-color:var(--border);">
+                <div>
+                    <div class="metric-sub" style="margin-bottom:0.3rem">This Month's Realized PnL</div>
+                    <div class="metric-value" id="monthly-pnl" style="font-size:1.5rem">--</div>
+                </div>
+            </div>
         </div>
 
         <div class="card grid-full">
@@ -698,7 +706,19 @@
                 biasEl.className = 'nexus-bias ' + (bias === 'BULLISH' ? 'bias-bullish' : bias === 'BEARISH' ? 'bias-bearish' : 'bias-neutral');
                 document.getElementById('nexus-comment').textContent = nx.ai_comment || 'No AI comment available.';
                 document.getElementById('nexus-updated').textContent = 'Last update: ' + (nx.last_ai_update || 'N/A');
-                document.getElementById('onchain-risk').textContent = nx.onchain_risk || '--';
+
+                // --- Daily & Monthly PnL ---
+                const pnlSummary = data.pnl_summary || {};
+                const dailyPnl = parseFloat(pnlSummary.daily || 0);
+                const monthlyPnl = parseFloat(pnlSummary.monthly || 0);
+
+                const dailyEl = document.getElementById('daily-pnl');
+                dailyEl.textContent = (dailyPnl >= 0 ? '+' : '') + dailyPnl.toFixed(2) + ' USDT';
+                dailyEl.style.color = dailyPnl >= 0 ? 'var(--green)' : 'var(--red)';
+
+                const monthlyEl = document.getElementById('monthly-pnl');
+                monthlyEl.textContent = (monthlyPnl >= 0 ? '+' : '') + monthlyPnl.toFixed(2) + ' USDT';
+                monthlyEl.style.color = monthlyPnl >= 0 ? 'var(--green)' : 'var(--red)';
 
                 // --- SUB-SCORES BREAKDOWN ---
                 const sourcesContainer = document.getElementById('nexus-sources');

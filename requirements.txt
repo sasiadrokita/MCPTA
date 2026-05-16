@@ -28,6 +28,8 @@ itsdangerous==2.2.0
 Jinja2==3.1.6
 markdown-it-py==4.0.0
 MarkupSafe==3.0.3
+APScheduler>=3.10.1
+google-cloud-storage>=2.10.0
 mdurl==0.1.2
 oauthlib==3.3.1
 proto-plus==1.27.1
