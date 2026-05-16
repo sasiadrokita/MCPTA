@@ -212,7 +212,9 @@ def get_recent_exchange_trades(limit=5):
         print(f"Trade history fetch error: {e}")
         return "Exchange read error."
 
-def send_telegram_message(text):
+def send_telegram_message(text, force=False):
+    if not force:
+        return
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         return
     
@@ -909,7 +911,7 @@ JSON structure example:
             save_learning_data(learn_data)
             print(f"[REPORT] AI knowledge base evolved as part of the Master report.")
 
-        send_telegram_message(report_msg)
+        send_telegram_message(report_msg, force=True)
         print(f"[REPORT] Master Daily Report sent at {time.strftime('%H:%M:%S')}")
         
         # Archive to Black Box
