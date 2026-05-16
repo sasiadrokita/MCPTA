@@ -52,6 +52,7 @@ Includes a sleek, responsive, Dark Mode Web Dashboard built with Flask and Vanil
 - **Data Integrations:** Telethon (Telegram API), Google API Client (Gmail)
 - **Data Persistence:** SQLite3 (Trade Ledgers), JSON (Dynamic configurations)
 - **User Interface:** Flask, HTML5, CSS3, JavaScript (Real-time polling)
+- **Cloud Backup:** Google Cloud Storage (automated nightly snapshots with 7-day retention)
 
 ---
 
@@ -61,6 +62,53 @@ Includes a sleek, responsive, Dark Mode Web Dashboard built with Flask and Vanil
 2. **`bybit_gateway.py`**: The robust API wrapper handling exchange communication, signature generation, and order execution.
 3. **`gmail_intel_bridge.py` & `telegram_reader.py`**: The external "eyes and ears" gathering unstructured data for AI synthesis.
 4. **`dashboard.py`**: A lightweight web server providing a visual interface for the system's internal state.
+5. **`cloud_backup.py` & `cloud_restore.py`**: Automated disaster recovery — daily snapshots to GCS and one-command full restore.
+
+---
+
+## ☁️ Cloud Backup & Disaster Recovery
+
+Antigravity includes a built-in automated backup system that snapshots all critical data (database, config, OAuth tokens, Telegram sessions) to **Google Cloud Storage** every night at 3:00 AM. In the event of hardware failure, the entire system can be restored on a new machine in minutes.
+
+### Setting Up Google Cloud Storage (one-time)
+
+**Step 1 — Create a Storage Bucket:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) and select your project.
+2. Search for **Cloud Storage → Buckets** and click **Create**.
+3. Choose a unique name (e.g. `my-antigravity-backup`).
+4. Select a **Region** — for the free tier choose `us-central1`, `us-east1`, or `us-west1`.
+5. Leave *Storage class* as **Standard** and click **Create**.
+
+> **Cost:** Google's Always Free tier includes **5 GB** of Standard storage in US regions. With daily compressed snapshots (~10 MB each) and 7-day retention, you will use less than 100 MB — **completely free**.
+
+**Step 2 — Create a Service Account (API key for the bot):**
+1. Search for **IAM & Admin → Service Accounts** and click **Create Service Account**.
+2. Name it (e.g. `backup-bot`) and click *Create and Continue*.
+3. Assign the role: **Cloud Storage → Storage Object Admin**.
+4. Click *Done*, then open the new account → **Keys** tab → **Add Key → Create new key → JSON**.
+5. Save the downloaded `.json` file as `gcp-backup-key.json` in your project root.
+
+**Step 3 — Configure environment:**
+```bash
+# In your .env file, add:
+GCP_BUCKET_NAME=your-bucket-name
+```
+
+> ⚠️ Never commit `gcp-backup-key.json` to Git — it is already excluded in `.gitignore`.
+
+For full backup and restore instructions, see [**CLOUD_BACKUP_GUIDE.md**](CLOUD_BACKUP_GUIDE.md).
+
+---
+
+## 🔧 Disaster Recovery (New Hardware)
+
+If your server fails, restoring to a fresh machine takes a single command on your local PC:
+
+```bash
+bash setup_pi.sh
+```
+
+This script will automatically configure SSH access, set the hostname, install all dependencies, clone this repository, restore your latest cloud backup, and start all services. **No manual steps required.**
 
 ---
 
