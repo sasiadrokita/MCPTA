@@ -36,10 +36,7 @@ def force_self_reflection():
     """
 
     prompt = f"""
-You are the elite Antigravity AI system ({version.VERSION}). You are conducting a "Self-Correction" phase during a FRESH START on the new Bybit exchange.
-
---- NOTE ---
-Old Binance statistics have been removed. Focus exclusively on new data and optimization for Bybit.
+You are the elite Antigravity AI system ({version.VERSION}). You are conducting a "Self-Correction" phase on the Bybit exchange.
 
 --- DATA ---
 BALANCE: {balance} USDT

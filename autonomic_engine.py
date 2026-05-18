@@ -134,6 +134,7 @@ def load_learning_data():
 
 # --- CRITICAL ADDITION: LOADING DATA INTO GLOBAL VARIABLE ---
 learn_data = load_learning_data()
+GLOBAL_STATE['last_report_day'] = learn_data.get('last_report_day', -1)
 print(f"[LEARN] Initialized parameters for: {list(learn_data.get('parameters', {}).keys())}")
 
 def save_learning_data(data):
@@ -834,9 +835,7 @@ def generate_master_daily_report():
 
     prompt = f"""
 Jesteś elitarnym systemem Antigravity AI {version.FULL_VERSION}, dostarczającym profesjonalne raporty "On-chain & Market Insights".
-Twoim celem jest przygotowanie kompleksowego, strukturalnego raportu dla użytkownika, który łączy analizę makro, strukturę rynku i Twoją własną ewolucję jako tradera na nowej giełdzie Bybit (faza FRESH START).
-
-UWAGA: Wszystkie stare statystyki z Binance zostały zresetowane. Ucz się od nowa na podstawie obecnych wyników.
+Twoim celem jest przygotowanie kompleksowego, strukturalnego raportu dla użytkownika, który łączy analizę makro, strukturę rynku i Twoją bieżącą ewolucję jako tradera na giełdzie Bybit.
 
 IMPORTANT: Use ONLY single quotes (') inside the "telegram_message" and "new_lessons" text fields to avoid JSON syntax errors. NEVER use double quotes (") inside a JSON string.
 
@@ -1124,6 +1123,8 @@ def background_tasks():
             if now_dt.tm_hour == 8 and GLOBAL_STATE['last_report_day'] != now_dt.tm_mday:
                 # OPT v22.3.0: last_report_day guard is sufficient — removed costly BLACK_BOX.md file scan
                 GLOBAL_STATE['last_report_day'] = now_dt.tm_mday
+                learn_data['last_report_day'] = now_dt.tm_mday
+                save_learning_data(learn_data)
                 generate_master_daily_report()
                 GLOBAL_STATE['last_report_hour'] = now_dt.tm_hour
                 # run_self_learning_optimizer was removed from here to prevent conflicting reports.
