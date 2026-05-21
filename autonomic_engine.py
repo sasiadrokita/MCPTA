@@ -1296,6 +1296,9 @@ def process_message(ws, message):
                                     real_pnl = float(pnl_data[0].get('realizedPnl', 0.0)) if pnl_data else 0.0
                                     exit_p = float(pnl_data[0].get('exit_price', pnl_data[0].get('avgExitPrice', 0.0))) if pnl_data else 0.0
                                     bot_memory.save_trade_close(sym, exit_p, real_pnl, "WSS Bybit qty=0", _mem_tid)
+                                    # Trigger lesson extraction for every closed trade
+                                    if LESSON_EXTRACTOR_OK and _mem_tid:
+                                        ai_lesson_extractor.trigger_lesson_extraction(_mem_tid)
                             except Exception as _me: print(f"[BG CLOSE ERROR] {sym}: {_me}")
 
                         side = GLOBAL_STATE['open_trades'][symbol].get("side", "UNKNOWN")
