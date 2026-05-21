@@ -1745,6 +1745,12 @@ MENTAL NOTES (EVOLUTION):
 ACTIVE POSITION (IF ANY):
 {active_trade_str}
 
+RISK MANAGEMENT RULES (MANDATORY):
+- Your tp_price MUST be at least 1.5x further from current price than sl_price (minimum Risk:Reward = 1.5).
+- Example: if SL is 0.8% away from entry, TP must be at least 1.2% away.
+- NEVER set TP closer to entry than SL. This is the #1 reason for losses.
+- Prefer setups where R:R >= 2.0 for higher confidence.
+
 Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": float, "scale": 0.1-1.0, "leverage": int, "wave_analysis": "short_desc", "reason": "string"}}
 """
             try:
@@ -1844,11 +1850,22 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                             risk_dist = abs(current_price - sl_price)
 
                         # Minimum SL distance (protection from market noise)
-                        min_sl_dist = current_price * 0.008
+                        min_sl_dist = current_price * 0.005
                         if risk_dist < min_sl_dist:
-                            print(f"[{symbol}] SL FLOOR: AI suggested tight SL ({risk_dist/current_price*100:.2f}%). Expanding to 0.8%.", flush=True)
+                            print(f"[{symbol}] SL FLOOR: AI suggested tight SL ({risk_dist/current_price*100:.2f}%). Expanding to 0.5%.", flush=True)
                             sl_price = round(current_price - min_sl_dist if signal_dir == "LONG" else current_price + min_sl_dist, price_precision)
                             risk_dist = abs(current_price - sl_price)
+
+                    # --- ENFORCE MINIMUM RISK:REWARD RATIO OF 1.5 ---
+                    reward_dist = abs(tp_price - current_price)
+                    if risk_dist > 0 and reward_dist / risk_dist < 1.5:
+                        min_tp_dist = risk_dist * 1.5
+                        old_tp = tp_price
+                        if signal_dir == "LONG":
+                            tp_price = round(current_price + min_tp_dist, price_precision)
+                        else:
+                            tp_price = round(current_price - min_tp_dist, price_precision)
+                        print(f"[{symbol}] R:R FIX: TP extended from {old_tp} to {tp_price} (min 1.5 R:R, SL dist={risk_dist/current_price*100:.2f}%, TP dist={min_tp_dist/current_price*100:.2f}%)", flush=True)
                     
                     if risk_dist > 0:
                         raw_qty = (risk_amount / risk_dist) * ai_scale
