@@ -833,6 +833,20 @@ def generate_master_daily_report():
     # 5. Exchange history (Ground Truth) - Optimization v22.4 (limit 50 -> 5)
     exchange_history = get_recent_exchange_trades(limit=5)
 
+    # 6. Active Positions (Ground Truth)
+    active_positions_list = bybit.get_positions()
+    if active_positions_list:
+        formatted_positions = []
+        for p in active_positions_list:
+            tps_str = ", ".join([str(tp) for tp in p['tps']]) if p.get('tps') else "None"
+            formatted_positions.append(
+                f"- {p['symbol_raw']}: {p['side']} @ {p['entry_price']} "
+                f"(Size: {p['qty']}, SL: {p['sl']}, TP: {tps_str}, Unrealized PnL: {p['unrealized_pnl']:.2f} USDT)"
+            )
+        positions_str = "\n".join(formatted_positions)
+    else:
+        positions_str = "No active positions."
+
     prompt = f"""
 Jesteś elitarnym systemem Antigravity AI {version.FULL_VERSION}, dostarczającym profesjonalne raporty "On-chain & Market Insights".
 Twoim celem jest przygotowanie kompleksowego, strukturalnego raportu dla użytkownika, który łączy analizę makro, strukturę rynku i Twoją bieżącą ewolucję jako tradera na giełdzie Bybit.
@@ -844,6 +858,8 @@ Balance: {wallet_bal:.2f} USDT (Available: {avail_bal:.2f} USDT)
 Fear & Greed Index: {fgi}
 Nexus State: {nexus}
 AI Performance Metrics: {metrics}
+Active Positions (Ground Truth):
+{positions_str}
 AI Lessons Learned:
 {lessons}
 Recent Engine Trades:
@@ -860,6 +876,7 @@ Wygeneruj raport w formacie JSON, zawierający:
 1. `telegram_message`: Profesjonalny, zwięzły raport w formacie Markdown, podsumowujący stan rynku, Twoje wnioski i kluczowe metryki. Skup się na:
     - Ogólnym sentymencie (FGI, Nexus).
     - **Podaj wyraźnie oba parametry salda** (Total Equity and Available Margin).
+    - Bieżących otwartych pozycjach: W sekcji "Bieżące Otwarte Pozycje" (w "telegram_message") musisz wymienić DOKŁADNIE i WYŁĄCZNIE te pozycje, które są podane w "Active Positions (Ground Truth)" we wprowadzonych danych. Jeśli nie ma tam żadnej pozycji, napisz "Brak otwartych pozycji". Nie zmyślaj, nie zgaduj ani nie dodawaj pozycji, których tam nie ma.
     - Kluczowych ruchach cenowych i Twoich decyzjach.
     - Wnioskach z ostatnich transakcji (jeśli są).
     - Perspektywach na nadchodzący dzień.

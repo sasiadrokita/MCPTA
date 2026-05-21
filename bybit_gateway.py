@@ -191,23 +191,81 @@ class BybitGateway:
     def get_closed_pnl(self, symbol, limit=1):
         """Fetches PnL from recently closed transactions."""
         try:
-            # In Bybit V5 Unified it's best to check fetchClosedPnl or fetchMyTrades
-            # CCXT unifies this as fetchClosedPnl in newer versions
+            # We normalize the symbol to raw format (e.g. BTCUSDT) for Bybit V5 private API
+            raw_symbol = symbol.replace('/', '').replace(':USDT', '').replace('USDT', '') + 'USDT'
+            
+            # Direct Bybit V5 private API call
+            res = self.exchange.private_get_v5_position_closed_pnl({
+                'category': 'linear',
+                'symbol': raw_symbol,
+                'limit': limit
+            })
+            
+            pnl_list = []
+            if res and res.get('retCode') == '0' and 'result' in res and 'list' in res['result']:
+                for item in res['result']['list']:
+                    pnl_list.append({
+                        'symbol': item.get('symbol'),
+                        'side': item.get('side'),
+                        'realizedPnl': float(item.get('closedPnl', 0.0)),
+                        'closedPnl': float(item.get('closedPnl', 0.0)),
+                        'pnl': float(item.get('closedPnl', 0.0)),
+                        'exit_price': float(item.get('avgExitPrice', 0.0)),
+                        'avgExitPrice': float(item.get('avgExitPrice', 0.0)),
+                        'avgEntryPrice': float(item.get('avgEntryPrice', 0.0)),
+                        'timestamp': int(item.get('updatedTime', 0)),
+                        'updatedTime': int(item.get('updatedTime', 0))
+                    })
+                return pnl_list
+            
+            # Fallback to fetch_closed_pnl (if CCXT supports it in the future)
             if hasattr(self.exchange, 'fetch_closed_pnl'):
-                return self.exchange.fetch_closed_pnl(symbol, limit=limit)
+                # normalize to ccxt format
+                base_sym = symbol.replace('/', '').replace(':USDT', '').replace('USDT', '')
+                linear_symbol = f"{base_sym}/USDT:USDT"
+                ccxt_pnl = self.exchange.fetch_closed_pnl(linear_symbol, limit=limit)
+                if ccxt_pnl:
+                    pnl_list = []
+                    for item in ccxt_pnl:
+                        pnl_val = float(item.get('pnl', item.get('realizedPnl', 0.0)))
+                        pnl_list.append({
+                            'symbol': item.get('symbol'),
+                            'side': item.get('side', ''),
+                            'realizedPnl': pnl_val,
+                            'closedPnl': pnl_val,
+                            'pnl': pnl_val,
+                            'exit_price': float(item.get('exitPrice', item.get('price', 0.0))),
+                            'avgExitPrice': float(item.get('exitPrice', item.get('price', 0.0))),
+                            'avgEntryPrice': float(item.get('entryPrice', 0.0)),
+                            'timestamp': item.get('timestamp', 0),
+                            'updatedTime': item.get('timestamp', 0)
+                        })
+                    return pnl_list
             
             # Fallback to fetch_my_trades
-            trades = self.exchange.fetch_my_trades(symbol, limit=20)
+            base_sym = symbol.replace('/', '').replace(':USDT', '').replace('USDT', '')
+            linear_symbol = f"{base_sym}/USDT:USDT"
+            trades = self.exchange.fetch_my_trades(linear_symbol, limit=20)
             if trades:
-                # Search for the last transaction with realizedPnl
                 closed_trades = [t for t in reversed(trades) if t.get('info', {}).get('closedPnl')]
                 if closed_trades:
-                    last_trade = closed_trades[0]
-                    return [{
-                        'symbol': last_trade['symbol'],
-                        'realizedPnl': float(last_trade['info'].get('closedPnl', 0)),
-                        'timestamp': last_trade['timestamp']
-                    }]
+                    pnl_list = []
+                    for last_trade in closed_trades[:limit]:
+                        raw = last_trade.get('info', {})
+                        pnl_val = float(raw.get('closedPnl', 0.0))
+                        pnl_list.append({
+                            'symbol': last_trade['symbol'],
+                            'side': last_trade.get('side', raw.get('side', '')),
+                            'realizedPnl': pnl_val,
+                            'closedPnl': pnl_val,
+                            'pnl': pnl_val,
+                            'exit_price': float(raw.get('execPrice', 0.0)),
+                            'avgExitPrice': float(raw.get('execPrice', 0.0)),
+                            'avgEntryPrice': float(raw.get('avgEntryPrice', 0.0)),
+                            'timestamp': last_trade['timestamp'],
+                            'updatedTime': last_trade['timestamp']
+                        })
+                    return pnl_list
             return []
         except Exception as e:
             print(f"[BYBIT] PnL fetch error: {e}")
