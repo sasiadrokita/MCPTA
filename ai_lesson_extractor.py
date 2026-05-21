@@ -39,8 +39,28 @@ def _extractor_worker(trade_id: int):
         # 2. Construct prompt
         result_txt = "LOSS (ERROR TO FIX)" if pnl < 0 else "PROFIT (SUCCESS TO REPLICATE)"
         
+        # Parse context for structured display
+        try:
+            ctx_data = json.loads(context) if isinstance(context, str) else (context or {})
+        except:
+            ctx_data = {}
+        
+        ctx_lines = []
+        field_labels = {
+            "market_regime": "Market Regime", "adx": "ADX", "rsi": "RSI (15m)", "atr": "ATR",
+            "macro_bias": "Nexus Macro Bias", "nexus_score": "Nexus Score",
+            "sfp": "SFP Signal", "symmetry": "BTC/ETH Symmetry",
+            "wave_analysis": "Elliott Wave Context", "sl": "Stop Loss", "tp": "Take Profit",
+            "leverage": "Leverage", "planned_rr": "Planned R:R", "portfolio": "Portfolio State",
+            "reason": "AI Entry Reasoning"
+        }
+        for field, label in field_labels.items():
+            if field in ctx_data:
+                ctx_lines.append(f"  - {label}: {ctx_data[field]}")
+        ctx_summary = "\n".join(ctx_lines) if ctx_lines else str(context)
+
         prompt = f"""
-You are the lead analyst of Antigravity AI. Your task is to extract a critical, single lesson from the recently completed trade.
+You are the lead analyst of Antigravity AI. Your task is to extract a CONTEXT-DEPENDENT lesson from this completed trade.
 
 *** TRADE DATA ***
 Symbol: {symbol}
@@ -48,18 +68,24 @@ Type: {side}
 Result: {result_txt} (PnL: {pnl:.2f} USDT)
 Entry: {entry_price} ({open_ts})
 Exit: {exit_price} ({close_ts})
-Market Context (T0 - entry moment):
-{context}
 
-*** TASK ***
-Identify the single most important factor that determined the outcome. 
-Generate one, concise, iron-clad rule (Rule) that will protect the system from repeating this error (or help repeat the success).
+*** FULL MARKET CONTEXT AT ENTRY ***
+{ctx_summary}
 
-Respond STRICTLY in JSON format, without markdown blocks (` ```json `), using exactly these keys:
+*** CRITICAL TASK ***
+Analyze WHY this trade succeeded or failed given the SPECIFIC market conditions at entry.
+
+KEY INSIGHT: A rule that applies in one market constellation may NOT apply in another.
+- Example of WRONG lesson: "Never open SHORT when RSI is oversold."
+- Example of CORRECT lesson: "Never open SHORT when RSI is oversold (<30) AND Nexus Score > 6.0 (BULLISH) AND ADX < 20 (weak trend). In that specific combination, the bounce risk is too high."
+
+Generate one concise, iron-clad CONDITIONAL rule that captures the relationship between market conditions and outcome.
+
+Respond STRICTLY in JSON format (no markdown blocks), using exactly these keys:
 {{
-    "rule_if": "A very specific technical/macro condition from the context of this trade, e.g., When RSI is > 80 and Sentiment is BEARISH...",
-    "rule_then": "Operational rule for the engine, e.g., DO NOT OPEN LONG positions regardless of correlations...",
-    "rule_because": "Short justification derived from the error/success in this specific trade, e.g., In this case, it led to an immediate reversal after hitting a resistance wall."
+    "rule_if": "A very specific combination of market conditions from the entry context (regime, RSI, ADX, nexus bias, SFP, wave, portfolio state) that characterizes THIS specific setup. Be precise about thresholds.",
+    "rule_then": "Operational directive: what the bot SHOULD or SHOULD NOT do in that specific constellation. E.g., 'AVOID opening SHORT', or 'PRIORITIZE LONG with scale >= 0.7'.",
+    "rule_because": "Short, precise causal explanation based on this specific trade outcome. Explain the market mechanism that caused the profit or loss."
 }}
 """
 

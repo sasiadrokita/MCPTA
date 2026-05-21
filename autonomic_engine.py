@@ -1713,10 +1713,18 @@ def evaluate_market_condition(symbol, current_price):
             
             ai_lessons_text = "No historical lessons for this instrument."
             if BOT_MEMORY_OK:
-                recent_lessons = bot_memory.get_recent_lessons(symbol, limit=3)
+                recent_lessons = bot_memory.get_recent_lessons(symbol, limit=5)
                 if recent_lessons:
-                    rules_str = "\n".join([f"- IF {l['rule_if']} THEN {l['rule_then']} (BECAUSE: {l['rule_because']})" for l in recent_lessons])
-                    ai_lessons_text = f"CRITICAL LESSONS LEARNED FROM PAST MISTAKES/WINS:\n{rules_str}\nYOU MUST ADHERE TO THESE RULES."
+                    rules_str = "\n".join([
+                        f"  [{i+1}] ONLY IF: {l['rule_if']}\n       → THEN: {l['rule_then']}\n       WHY: {l['rule_because']}"
+                        for i, l in enumerate(recent_lessons)
+                    ])
+                    ai_lessons_text = (
+                        f"CONDITIONAL LESSONS FROM PAST TRADES (apply ONLY when the exact market conditions match):\n"
+                        f"{rules_str}\n"
+                        f"IMPORTANT: These rules are NOT universal. Each rule is tied to a specific market constellation. "
+                        f"Check if current conditions (regime, RSI, ADX, nexus, SFP) MATCH the rule's condition before applying it."
+                    )
 
             prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
 PRIMARY OBJECTIVE: Your ultimate mission is to safely and aggressively multiply the user's capital.
@@ -1916,7 +1924,24 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                         try:
                             _trade_id = bot_memory.save_trade_open(
                                 symbol=symbol, side=signal_dir, entry_price=current_price, qty=qty,
-                                context={"sl": sl_price, "tp": tp_price, "leverage": ai_leverage, "reason": ai_reason}
+                                context={
+                                    "sl": sl_price, "tp": tp_price, "leverage": ai_leverage,
+                                    "reason": ai_reason,
+                                    # Full market context for context-aware lesson extraction
+                                    "rsi": round(rsi, 2),
+                                    "atr": round(atr, 4),
+                                    "ema": round(ema, 4),
+                                    "market_regime": market_regime,
+                                    "adx": round(adx, 2),
+                                    "sfp": sfp_signal if sfp_signal else "None",
+                                    "symmetry": symmetry_desc,
+                                    "nexus_score": nexus_state.get("nexus_score", 5.0),
+                                    "macro_bias": nexus_state.get("macro_bias", "NEUTRAL"),
+                                    "wave_analysis": decision.get("wave_analysis", ""),
+                                    "scale": ai_scale,
+                                    "portfolio": portfolio_summary,
+                                    "planned_rr": round(abs(tp_price - current_price) / abs(sl_price - current_price), 2) if abs(sl_price - current_price) > 0 else 0
+                                }
                             )
                             GLOBAL_STATE['open_trades'][symbol]["memory_trade_id"] = _trade_id
                             # [v23.4] Crucial for position tracking and auto-close
