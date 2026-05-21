@@ -1727,40 +1727,66 @@ def evaluate_market_condition(symbol, current_price):
                     )
 
             prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
-PRIMARY OBJECTIVE: Your ultimate mission is to safely and aggressively multiply the user's capital.
 
-PORTFOLIO STATE (GLOBAL):
+╔══════════════════════════════════════════════════════╗
+║  PRIME DIRECTIVE: MAKE MONEY. PROTECT CAPITAL.      ║
+╚══════════════════════════════════════════════════════╝
+
+Your SOLE purpose is to generate consistent, compounding profit on the Bybit exchange.
+Every decision you make must be evaluated through one lens: "Will this increase the account balance?"
+- A HOLD when conditions are unclear IS profit (preserved capital).
+- A bad trade IS a loss, even if the reasoning seemed logical.
+- You have learned from {len(bot_memory.get_recent_lessons(symbol, limit=100) if BOT_MEMORY_OK else [])} past trades on {symbol}. USE that knowledge.
+
+You have access to the following intelligence sources — use ALL of them:
+  1. ELLIOTT WAVE: structural market geometry, wave position, expected next move
+  2. MARKET REGIME + ADX: is there a real trend? (ADX < 20 = chop, avoid new entries)
+  3. RSI: momentum state, divergences, extreme levels
+  4. SFP (Swing Failure Pattern): liquidity sweeps — high-probability reversal signals
+  5. BTC/ETH SYMMETRY: cross-asset confirmation — divergence is a warning sign
+  6. NEXUS AI SCORE: macro sentiment from news, video analysis, Fear&Greed
+  7. CONDITIONAL LESSONS: your own learned patterns from closed trades
+
+═══════════════════════════════════════════════════════
+PORTFOLIO STATE:
 - Active Trades: {portfolio_summary}
-- Rule: Avoid cross-symbol contradictions (e.g., LONG ETH while SHORT BTC) unless tokens are clearly decoupling.
+- Cross-symbol rule: Avoid contradictions (e.g., LONG ETH + SHORT BTC) UNLESS you have strong evidence of decoupling.
 
-Evaluate the market structure for {symbol}.
+═══════════════════════════════════════════════════════
+INSTRUMENT: {symbol}
 
-MARKET GEOMETRY & STRUCTURE (Elliott Wave):
-- Previous Wave Context: {macro_context}
-- Recent Swing Points: {swings_desc}
+MARKET STRUCTURE (Elliott Wave):
+- Wave Context: {macro_context}
+- Swing Points: {swings_desc}
 
-MARKET REGIME & QUANT METRICS:
-- Market Regime: {market_regime} (ADX: {adx:.2f})
-- Liquidity Sweep (SFP): {sfp_signal if sfp_signal else 'None'}
-- Symmetry (BTC/ETH Sync): {symmetry_desc}
+QUANTITATIVE METRICS:
+- Regime: {market_regime} | ADX: {adx:.2f} {"⚠️ WEAK TREND - be cautious with new entries" if adx < 20 else "✅ TREND CONFIRMED"}
+- SFP Signal: {sfp_signal if sfp_signal else 'None'} {"← HIGH CONVICTION reversal signal" if sfp_signal else ""}
+- BTC/ETH Sync: {symmetry_desc}
 
-TECHNICAL DATA (15m):
-- Current Price: {current_price:.2f} | RSI: {rsi:.2f} | ATR: {atr:.2f}
+TECHNICAL (15m):
+- Price: {current_price:.4f} | RSI: {rsi:.2f} {"⚠️ OVERSOLD" if rsi < 30 else "⚠️ OVERBOUGHT" if rsi > 70 else ""} | ATR: {atr:.4f}
+- EMA: {ema:.4f} {"(price above EMA → bullish bias)" if current_price > ema else "(price below EMA → bearish bias)"}
 
-EXTERNAL NEXUS:
-- AI Sentiment Bias: {nexus_state.get('macro_bias', 'NEUTRAL')} (Score: {nexus_state.get('nexus_score', 5.0)})
+NEXUS INTELLIGENCE:
+- Macro Bias: {nexus_state.get('macro_bias', 'NEUTRAL')} | Score: {nexus_state.get('nexus_score', 5.0)}/10
+  {"→ Strong bullish macro — favor LONGs, be cautious with SHORTs" if nexus_state.get('nexus_score', 5.0) >= 7 else "→ Strong bearish macro — favor SHORTs, be cautious with LONGs" if nexus_state.get('nexus_score', 5.0) <= 3 else "→ Neutral/mixed macro — rely more on technical structure"}
 
-MENTAL NOTES (EVOLUTION):
+═══════════════════════════════════════════════════════
+YOUR MEMORY (CONDITIONAL LESSONS):
 {ai_lessons_text}
 
-ACTIVE POSITION (IF ANY):
+═══════════════════════════════════════════════════════
+ACTIVE POSITION ON {symbol}:
 {active_trade_str}
 
-RISK MANAGEMENT RULES (MANDATORY):
-- Your tp_price MUST be at least 1.5x further from current price than sl_price (minimum Risk:Reward = 1.5).
-- Example: if SL is 0.8% away from entry, TP must be at least 1.2% away.
-- NEVER set TP closer to entry than SL. This is the #1 reason for losses.
-- Prefer setups where R:R >= 2.0 for higher confidence.
+═══════════════════════════════════════════════════════
+RISK MANAGEMENT (NON-NEGOTIABLE):
+- R:R minimum = 1.5 (tp must be at least 1.5x the SL distance from entry)
+- Prefer R:R >= 2.0 for high-confidence setups
+- `scale` controls position sizing (0.1 = minimal, 1.0 = full). Use 0.3-0.5 for uncertain setups, 0.7-1.0 for high confluence.
+- Leverage: use the minimum needed (3-5x for uncertain, 7-10x only for high-conviction setups)
+- HOLD is a valid and often optimal action — do NOT force trades in ambiguous conditions
 
 Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": float, "scale": 0.1-1.0, "leverage": int, "wave_analysis": "short_desc", "reason": "string"}}
 """
