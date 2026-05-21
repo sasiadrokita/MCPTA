@@ -1130,6 +1130,8 @@ def update_trailing_stop(symbol, current_price, params, atr):
                 trade["algo_id"] = res['id']
                 trade["stop_order_id"] = res['id']
 
+_report_lock = threading.Lock()
+
 def background_tasks():
     global GLOBAL_STATE
     while True:
@@ -1138,14 +1140,17 @@ def background_tasks():
             now_dt = time.localtime()  # OPT v22.3.0: single call (was duplicated)
             # 8:00 AM (Central European Time) Daily Report
             if now_dt.tm_hour == 8 and GLOBAL_STATE['last_report_day'] != now_dt.tm_mday:
-                # OPT v22.3.0: last_report_day guard is sufficient — removed costly BLACK_BOX.md file scan
-                GLOBAL_STATE['last_report_day'] = now_dt.tm_mday
-                learn_data['last_report_day'] = now_dt.tm_mday
-                save_learning_data(learn_data)
-                generate_master_daily_report()
-                GLOBAL_STATE['last_report_hour'] = now_dt.tm_hour
-                # run_self_learning_optimizer was removed from here to prevent conflicting reports.
-                # Its logic was merged into the single morning report generated above.
+                if _report_lock.acquire(blocking=False):
+                    try:
+                        # Double-check after acquiring lock
+                        if GLOBAL_STATE['last_report_day'] != now_dt.tm_mday:
+                            GLOBAL_STATE['last_report_day'] = now_dt.tm_mday
+                            learn_data['last_report_day'] = now_dt.tm_mday
+                            save_learning_data(learn_data)
+                            generate_master_daily_report()
+                            GLOBAL_STATE['last_report_hour'] = now_dt.tm_hour
+                    finally:
+                        _report_lock.release()
 
             # Automatic Nexus Update (Hourly)
             if now_dt.tm_hour != GLOBAL_STATE['last_nexus_hour']:
