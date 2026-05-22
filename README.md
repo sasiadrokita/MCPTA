@@ -117,7 +117,7 @@ Includes a sleek, responsive, Dark Mode Web Dashboard built with Flask and Vanil
 - **Data Persistence:** SQLite3 (Trade Ledgers, Lessons), Redis (Circuit Breaker state, caching), JSON (Dynamic configs)
 - **User Interface:** Flask, HTML5, CSS3, JavaScript (Real-time polling)
 - **Cloud Backup:** Google Cloud Storage (automated nightly snapshots with 7-day retention)
-- **Hardware:** Raspberry Pi 5 (4GB RAM, 64GB SD)
+- **Hardware:** Raspberry Pi 4 (4GB RAM, 64GB SD)
 
 ---
 
