@@ -52,6 +52,7 @@ def _extractor_worker(trade_id: int):
             "sfp": "SFP Signal", "symmetry": "BTC/ETH Symmetry",
             "wave_analysis": "Elliott Wave Context", "sl": "Stop Loss", "tp": "Take Profit",
             "leverage": "Leverage", "planned_rr": "Planned R:R", "portfolio": "Portfolio State",
+            "funding_rate": "Funding Rate (at entry)", "cvd_5m": "CVD 5-min (at entry, +ve=buyers, -ve=sellers)",
             "reason": "AI Entry Reasoning"
         }
         for field, label in field_labels.items():

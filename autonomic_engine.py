@@ -1522,12 +1522,46 @@ def evaluate_market_condition(symbol, current_price):
         rsi = calculate_rsi(prices, params['rsi_period'])
         atr = calculate_atr(klines, params.get('atr_period', 14))
         adx = calculate_adx(klines, params.get('adx_period', 14))
-        
-        if current_price > ema:
-            market_regime = "TRENDING_UP"
-        else:
-            market_regime = "TRENDING_DOWN"
-        # Here the bot makes trading decisions...
+
+        # === 4-STATE MARKET REGIME CLASSIFIER ===
+        # Uses ADX (trend strength), ATR vs historical ATR (volatility), EMA (direction)
+        # States: TREND_UP | TREND_DOWN | RANGE_BOUND | VOLATILE_CHOP
+        try:
+            # Historical ATR baseline (last 50 bars vs last 14)
+            atr_long = calculate_atr(klines, min(50, len(klines) - 1)) if len(klines) > 15 else atr
+            atr_ratio = atr / atr_long if atr_long > 0 else 1.0  # > 1.3 = elevated volatility
+
+            # Bollinger Band Width (proxy for squeeze/expansion)
+            if len(prices) >= 20:
+                bb_mean = sum(prices[-20:]) / 20
+                bb_std = (sum((p - bb_mean) ** 2 for p in prices[-20:]) / 20) ** 0.5
+                bb_width = (4 * bb_std) / bb_mean if bb_mean > 0 else 0  # normalized BB width
+            else:
+                bb_width = 0.02  # default
+
+            trending = adx >= 22
+            volatile = atr_ratio > 1.35 or bb_width > 0.04
+            bullish = current_price > ema
+
+            if trending and volatile:
+                market_regime = "VOLATILE_CHOP"   # strong moves but unpredictable — stay out
+            elif trending and bullish:
+                market_regime = "TREND_UP"
+            elif trending and not bullish:
+                market_regime = "TREND_DOWN"
+            else:
+                market_regime = "RANGE_BOUND"     # ADX < 22, no clear direction
+
+            print(
+                f"[{symbol}] REGIME: {market_regime} "
+                f"(ADX={adx:.1f}, ATR_ratio={atr_ratio:.2f}, BB_width={bb_width:.3f})",
+                flush=True
+            )
+        except Exception as _re:
+            # Fallback to legacy binary regime
+            market_regime = "TREND_UP" if current_price > ema else "TREND_DOWN"
+            print(f"[{symbol}] REGIME FALLBACK: {market_regime} ({_re})", flush=True)
+
 
         # V21.9.0 DEEP LOCKDOWN: Physically prevents entry if inside 60m Anti-Churn window.
         now = time.time()
@@ -2008,12 +2042,42 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                     
                     if BOT_MEMORY_OK:
                         try:
+                            # === ENRICH CONTEXT: Funding Rate + CVD ===
+                            _funding_rate = "N/A"
+                            _cvd = "N/A"
+                            try:
+                                import requests as _req
+                                # Funding rate
+                                _fr = _req.get(
+                                    'https://api.bybit.com/v5/market/funding/history',
+                                    params={'category': 'linear', 'symbol': symbol, 'limit': 1},
+                                    timeout=3
+                                ).json()
+                                _fr_data = _fr.get('result', {}).get('list', [{}])
+                                if _fr_data:
+                                    _funding_rate = float(_fr_data[0].get('fundingRate', 0))
+                                # CVD — sum of (buy-vol - sell-vol) on 1m bars for last 5 bars
+                                _k = _req.get(
+                                    'https://api.bybit.com/v5/market/kline',
+                                    params={'category': 'linear', 'symbol': symbol, 'interval': '1', 'limit': 5},
+                                    timeout=3
+                                ).json()
+                                _bars = _k.get('result', {}).get('list', [])
+                                _cvd_val = 0.0
+                                for _b in _bars:
+                                    _o, _c, _vol = float(_b[1]), float(_b[4]), float(_b[5])
+                                    # Bullish bar: volume goes to buyers; bearish: to sellers
+                                    _cvd_val += _vol if _c >= _o else -_vol
+                                _cvd = round(_cvd_val, 2)
+                            except Exception:
+                                pass
+
                             _trade_id = bot_memory.save_trade_open(
                                 symbol=symbol, side=signal_dir, entry_price=current_price, qty=qty,
                                 context={
                                     "sl": sl_price, "tp": tp_price, "leverage": ai_leverage,
                                     "reason": ai_reason,
-                                    # Full market context for context-aware lesson extraction
+                                    # Quantitative market state
                                     "rsi": round(rsi, 2),
                                     "atr": round(atr, 4),
                                     "ema": round(ema, 4),
@@ -2026,7 +2090,10 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                                     "wave_analysis": decision.get("wave_analysis", ""),
                                     "scale": ai_scale,
                                     "portfolio": portfolio_summary,
-                                    "planned_rr": round(abs(tp_price - current_price) / abs(sl_price - current_price), 2) if abs(sl_price - current_price) > 0 else 0
+                                    "planned_rr": round(abs(tp_price - current_price) / abs(sl_price - current_price), 2) if abs(sl_price - current_price) > 0 else 0,
+                                    # Bot-requested enrichment (for lesson quality)
+                                    "funding_rate": _funding_rate,
+                                    "cvd_5m": _cvd,
                                 }
                             )
                             GLOBAL_STATE['open_trades'][symbol]["memory_trade_id"] = _trade_id
