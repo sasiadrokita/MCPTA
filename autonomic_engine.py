@@ -1796,11 +1796,13 @@ ACTIVE POSITION ON {symbol}:
 
 ═══════════════════════════════════════════════════════
 RISK MANAGEMENT (NON-NEGOTIABLE):
-- R:R minimum = 1.5 (tp must be at least 1.5x the SL distance from entry)
-- Prefer R:R >= 2.0 for high-confidence setups
-- `scale` controls position sizing (0.1 = minimal, 1.0 = full). Use 0.3-0.5 for uncertain setups, 0.7-1.0 for high confluence.
-- Leverage: use the minimum needed (3-5x for uncertain, 7-10x only for high-conviction setups)
-- HOLD is a valid and often optimal action — do NOT force trades in ambiguous conditions
+- SL/TP are VALIDATED against the current ATR ({atr:.4f} on 15m).
+- SL range: 1.5x–3.0x ATR from entry = [{atr*1.5:.4f}, {atr*3.0:.4f}] — place SL WITHIN this range.
+- TP minimum: 2.25x ATR from entry = {atr*2.25:.4f} — ensures R:R ≥ 1.5.
+- For HIGH-CONVICTION setups aim for TP at 3.0x–4.0x ATR (R:R 2.0+).
+- `scale`: 0.3-0.5 for uncertain setups, 0.7-1.0 for high confluence.
+- Leverage: 3-5x uncertain, 7-10x only for high-conviction setups.
+- HOLD is a valid and often optimal action — do NOT force trades in ambiguous conditions.
 
 Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": float, "scale": 0.1-1.0, "leverage": int, "wave_analysis": "short_desc", "reason": "string"}}
 """
@@ -1898,38 +1900,75 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                     sl_price = round(float(ai_sl), price_precision)
                     tp_price = round(float(ai_tp), price_precision)
                     risk_dist = abs(current_price - sl_price)
-                    
+
                     if not is_test_mission:
-                        # Maximum SL distance (capital intensity)
-                        max_sl_dist = current_price * 0.015
-                        if risk_dist > max_sl_dist:
-                            print(f"[{symbol}] SL CAP: AI suggested wide SL ({risk_dist/current_price*100:.1f}%). Capping at 1.5%.", flush=True)
-                            sl_price = round(current_price - max_sl_dist if signal_dir == "LONG" else current_price + max_sl_dist, price_precision)
-                            risk_dist = abs(current_price - sl_price)
+                        # === ATR-BASED DYNAMIC SL/TP BOUNDS ===
+                        # ATR represents actual market noise on this timeframe.
+                        # SL must be outside noise (min 1.5x ATR) but not too capital-hungry (max 3.0x ATR).
+                        # TP must be at least 2.25x ATR to ensure minimum R:R of 1.5.
 
-                        # Minimum SL distance (protection from market noise)
-                        min_sl_dist = current_price * 0.005
-                        if risk_dist < min_sl_dist:
-                            print(f"[{symbol}] SL FLOOR: AI suggested tight SL ({risk_dist/current_price*100:.2f}%). Expanding to 0.5%.", flush=True)
-                            sl_price = round(current_price - min_sl_dist if signal_dir == "LONG" else current_price + min_sl_dist, price_precision)
-                            risk_dist = abs(current_price - sl_price)
+                        atr_sl_min = atr * 1.5   # minimum SL: just outside noise
+                        atr_sl_max = atr * 3.0   # maximum SL: capital protection cap
+                        atr_tp_min = atr * 2.25  # minimum TP: guarantees R:R >= 1.5 vs 1.5x ATR SL
 
-                    # --- ENFORCE MINIMUM RISK:REWARD RATIO OF 1.5 ---
-                    reward_dist = abs(tp_price - current_price)
-                    if risk_dist > 0 and reward_dist / risk_dist < 1.5:
-                        min_tp_dist = risk_dist * 1.5
-                        old_tp = tp_price
-                        if signal_dir == "LONG":
-                            tp_price = round(current_price + min_tp_dist, price_precision)
+                        atr_pct = atr / current_price * 100
+
+                        # --- SL CAP (too wide — wastes capital) ---
+                        if risk_dist > atr_sl_max:
+                            old_sl = sl_price
+                            sl_price = round(
+                                current_price - atr_sl_max if signal_dir == "LONG" else current_price + atr_sl_max,
+                                price_precision
+                            )
+                            risk_dist = abs(current_price - sl_price)
+                            print(
+                                f"[{symbol}] SL CAP (ATR): {old_sl} → {sl_price} "
+                                f"(AI: {abs(current_price-old_sl)/current_price*100:.2f}% > 3.0x ATR={atr_pct*3:.2f}%)",
+                                flush=True
+                            )
+
+                        # --- SL FLOOR (too tight — gets stopped by noise) ---
+                        if risk_dist < atr_sl_min:
+                            old_sl = sl_price
+                            sl_price = round(
+                                current_price - atr_sl_min if signal_dir == "LONG" else current_price + atr_sl_min,
+                                price_precision
+                            )
+                            risk_dist = abs(current_price - sl_price)
+                            print(
+                                f"[{symbol}] SL FLOOR (ATR): {old_sl} → {sl_price} "
+                                f"(AI: {abs(current_price-old_sl)/current_price*100:.2f}% < 1.5x ATR={atr_pct*1.5:.2f}%)",
+                                flush=True
+                            )
+
+                        # --- TP FLOOR (ensures minimum R:R = 1.5) ---
+                        reward_dist = abs(tp_price - current_price)
+                        if reward_dist < atr_tp_min:
+                            old_tp = tp_price
+                            tp_price = round(
+                                current_price + atr_tp_min if signal_dir == "LONG" else current_price - atr_tp_min,
+                                price_precision
+                            )
+                            reward_dist = abs(tp_price - current_price)
+                            rr_actual = reward_dist / risk_dist if risk_dist > 0 else 0
+                            print(
+                                f"[{symbol}] TP FLOOR (ATR): {old_tp} → {tp_price} "
+                                f"(min 2.25x ATR={atr_pct*2.25:.2f}%, R:R={rr_actual:.2f})",
+                                flush=True
+                            )
                         else:
-                            tp_price = round(current_price - min_tp_dist, price_precision)
-                        print(f"[{symbol}] R:R FIX: TP extended from {old_tp} to {tp_price} (min 1.5 R:R, SL dist={risk_dist/current_price*100:.2f}%, TP dist={min_tp_dist/current_price*100:.2f}%)", flush=True)
-                    
+                            rr_actual = reward_dist / risk_dist if risk_dist > 0 else 0
+                            print(
+                                f"[{symbol}] SL/TP OK: SL={risk_dist/current_price*100:.3f}% ({risk_dist/atr:.2f}x ATR), "
+                                f"TP={reward_dist/current_price*100:.3f}% ({reward_dist/atr:.2f}x ATR), R:R={rr_actual:.2f}",
+                                flush=True
+                            )
+
                     if risk_dist > 0:
                         raw_qty = (risk_amount / risk_dist) * ai_scale
                     else:
                         raw_qty = risk_amount / current_price
-                    
+
                     qty = round(raw_qty, qty_precision)
                     print(f"[{symbol}] QTY CALC: raw={raw_qty:.4f}, prec={qty_precision}, final={qty}", flush=True)
 
