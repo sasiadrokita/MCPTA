@@ -32,6 +32,13 @@ except Exception as _le_err:
     LESSON_EXTRACTOR_OK = False
     print(f"[LESSON EXTRACTOR] Loading error: {_le_err}", flush=True)
 
+try:
+    import circuit_breaker
+    CIRCUIT_BREAKER_OK = True
+except Exception as _cb_err:
+    CIRCUIT_BREAKER_OK = False
+    print(f"[CIRCUIT BREAKER] Loading error: {_cb_err}", flush=True)
+
 # Telegram Channel Signal Intelligence
 try:
     import telegram_reader
@@ -1299,6 +1306,13 @@ def process_message(ws, message):
                                     # Trigger lesson extraction for every closed trade
                                     if LESSON_EXTRACTOR_OK and _mem_tid:
                                         ai_lesson_extractor.trigger_lesson_extraction(_mem_tid)
+                                    # Update Circuit Breaker
+                                    if CIRCUIT_BREAKER_OK:
+                                        trade_side = GLOBAL_STATE['open_trades'][sym].get('side', s)
+                                        if real_pnl > 0:
+                                            circuit_breaker.record_win(sym, trade_side)
+                                        elif real_pnl < 0:
+                                            circuit_breaker.record_loss(sym, trade_side)
                             except Exception as _me: print(f"[BG CLOSE ERROR] {sym}: {_me}")
 
                         side = GLOBAL_STATE['open_trades'][symbol].get("side", "UNKNOWN")
@@ -1839,6 +1853,13 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                 # Guard: No dual positions
                 if GLOBAL_STATE['open_trades'].get(symbol, {}).get("active", False):
                     return
+                # --- CIRCUIT BREAKER CHECK ---
+                if CIRCUIT_BREAKER_OK:
+                    blocked, cb_reason = circuit_breaker.is_blocked(symbol, ai_action)
+                    if blocked:
+                        print(f"[{symbol}] 🔴 {cb_reason}", flush=True)
+                        send_telegram_message(f"🔴 *[{symbol}] CIRCUIT BREAKER*\n`{cb_reason}`")
+                        return
                 signal_dir = ai_action
             elif ai_action == "EXIT" and is_revaluation:
                 # Early Exit implementation
