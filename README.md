@@ -4,7 +4,8 @@
 
   <p>
     <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version" />
-    <img src="https://img.shields.io/badge/AI-Google%20Gemini%202.5%20Flash-orange.svg" alt="Google Gemini" />
+    <img src="https://img.shields.io/badge/version-v23.0.0%20Adaptive%20Intelligence-blueviolet.svg" alt="Version" />
+    <img src="https://img.shields.io/badge/AI-Google%20Gemini%202.5%20Pro-orange.svg" alt="Google Gemini" />
     <img src="https://img.shields.io/badge/Exchange-Bybit%20Futures-black.svg" alt="Bybit" />
     <img src="https://img.shields.io/badge/Status-Active%20Development-success.svg" alt="Status" />
   </p>
@@ -14,11 +15,51 @@
 
 ## 📖 Overview
 
-**Antigravity** is not just another trading bot—it is a sophisticated, self-contained algorithmic trading system designed to mimic the analytical workflow of a professional quantitative trader. 
+**Antigravity** is not just another trading bot—it is a sophisticated, self-contained algorithmic trading system designed to mimic the analytical workflow of a professional quantitative trader.
 
 By fusing **real-time technical analysis** with **multimodal AI sentiment synthesis**, Antigravity parses unstructured data from the internet (Gmail macro reports, Telegram text signals, and even video analysis) to form a unified market worldview. It then autonomously executes and manages Futures trades on Bybit with strict risk management parameters.
 
 This project was built to demonstrate advanced system architecture, asynchronous data processing, prompt engineering, and the practical application of LLMs (Large Language Models) in high-stakes environments.
+
+---
+
+## 🗓️ Changelog
+
+### v23.0.0 — *Adaptive Intelligence* (2026-05-22)
+> Major architectural overhaul — the bot now adapts to market conditions dynamically and learns from its own mistakes in a context-aware manner.
+
+**New Modules:**
+- **`circuit_breaker.py`** — Tracks consecutive losses per `(symbol, side)` pair. After 3 consecutive losses, trading on that pair is blocked for 4 hours. State is persistent via Redis (JSON fallback). Resets on a win.
+
+**Core Engine (`autonomic_engine.py`):**
+- **4-State Market Regime Classifier** — replaced binary EMA-based regime with a multi-factor classifier using ADX, ATR-ratio, and Bollinger Band Width: `TREND_UP | TREND_DOWN | RANGE_BOUND | VOLATILE_CHOP`
+- **Dynamic ATR-Based SL/TP** — replaced fixed percentage bounds (0.5%–1.5%) with volatility-adaptive bounds: SL in `[1.5x, 3.0x ATR]`, TP minimum `2.25x ATR` (guarantees R:R ≥ 1.5)
+- **Profit-First AI Prompt** — complete rewrite of the decision prompt with explicit tool inventory, conditional guidance per regime/RSI/ADX state, and a clear `MAKE MONEY. PROTECT CAPITAL.` prime directive
+- **Context Enrichment at Entry** — saves Funding Rate and CVD-5min (Cumulative Volume Delta) alongside every trade open for higher-quality lesson extraction
+- **Circuit Breaker Integration** — checks `circuit_breaker.is_blocked()` before every new entry; calls `record_win/record_loss` after every close
+- **ATR values in AI prompt** — AI is shown exact `[SL_min, SL_max]` and `TP_min` in price units derived from current ATR
+
+**Learning System (`ai_lesson_extractor.py`):**
+- **Context-Aware Lesson Extraction** — lessons are now conditional rules tied to the specific market constellation at trade entry (regime, ADX, RSI, Nexus, SFP, CVD, funding rate)
+- **Improved prompt format** — lessons shown to AI as `ONLY IF [conditions] → THEN [directive]` to prevent blind rule application across different market states
+- **Lesson limit raised to 5** — AI now receives 5 recent lessons (up from 3) per evaluation cycle
+
+---
+
+### v22.3.0 — *Engine Optimizer* (2026-05-16)
+- Enforced minimum R:R = 1.5 in code (not just in prompt)
+- Lowered SL floor from 0.8% to 0.5%
+- Hooked `trigger_lesson_extraction` into `bg_close_handler` (learning was previously broken — never triggered)
+- Enriched trade context with RSI, ATR, EMA, ADX, SFP, Nexus Score, Symmetry, Wave Analysis at entry
+- Fixed `get_closed_pnl` returning 0.0 USDT (wrong Bybit endpoint)
+- Daily report now uses Bybit ground-truth data for active positions
+
+---
+
+### v22.0.0 — *Sentinel Protocol* (2026-04-08)
+- Hardware relocation to Raspberry Pi 5
+- Audit and reconciliation of SQLite ledger vs live Bybit trade history
+- Gmail macro bridge OAuth re-authentication
 
 ---
 
@@ -31,38 +72,52 @@ The system is built on a modular intelligence ingestion engine. It actively moni
 - **Video Analysis Bridge:** Uses Google Gemini to analyze market strategy videos shared on VIP Telegram channels, converting audiovisual insights into structured JSON data.
 
 ### 🌐 Data Nexus Fusion
-Antigravity doesn't rely on a single metric. The **Data Nexus** aggregates Technical Analysis (RSI, EMA, ATR), AI-synthesized Macro Sentiment, and real-time Social Signals, assigning weighted scores to calculate an overall `Market Readiness Score` before taking any position.
+Antigravity doesn't rely on a single metric. The **Data Nexus** aggregates Technical Analysis (RSI, EMA, ATR, ADX), AI-synthesized Macro Sentiment, and real-time Social Signals, assigning weighted scores to calculate an overall `Nexus Score` before taking any position.
 
-### 🧬 Autonomic Learning Engine
-The bot self-optimizes. By logging every trade's outcome into a persistent SQLite ledger, the system periodically analyzes its own win-rate. It dynamically adjusts its technical tolerances (e.g., modifying the RSI trigger threshold or ATR multiplier) to adapt to changing market regimes (Bull, Bear, Choppy).
+### 🧬 Context-Aware Learning Engine
+The bot self-optimizes. Every closed trade triggers `ai_lesson_extractor`, which uses the **full market state at entry** (regime, RSI, ADX, SFP, CVD, funding rate, Nexus) to generate a **conditional rule** — not a universal one. The AI learns that a pattern is a mistake *only in a specific constellation*, allowing it to short with confidence in the right conditions while avoiding the same pattern in others.
+
+### 🔴 Circuit Breaker (v23.0)
+After 3 consecutive Stop-Loss hits on the same `(symbol, side)` pair, the Circuit Breaker activates a 4-hour trading halt on that pair. This prevents the catastrophic loss patterns observed in the v22 audit (22 losses vs 8 wins). State survives engine restarts via Redis persistence.
+
+### 📐 Dynamic ATR-Based Risk Management (v23.0)
+Stop-Loss and Take-Profit distances are no longer static percentages. They are calculated as multiples of the current 15-minute ATR, ensuring that every position's SL is placed *outside the actual market noise* for that asset at that moment.
 
 ### 🛡️ Sentinel Protocol
-Capital preservation is paramount. The system features a dedicated `binance_algo_bridge` / `bybit_gateway` monitoring thread that ensures every position is immediately wrapped in dynamic Stop-Loss and Take-Profit orders, preventing liquidations during sudden API disconnects or flash crashes.
+Capital preservation is paramount. The system features a dedicated `bybit_gateway` monitoring thread that ensures every position is immediately wrapped in dynamic Stop-Loss and Take-Profit orders, preventing liquidations during sudden API disconnects or flash crashes.
 
 ### 🖥️ Real-time Mission Control Dashboard
 Includes a sleek, responsive, Dark Mode Web Dashboard built with Flask and Vanilla JS. It provides real-time visibility into the bot's heartbeat, active trades, historic PnL, AI sentiment reasoning, and systemic logs.
 
 ---
 
-## 🛠️ Technology Stack
+## 🏗️ System Architecture
 
-- **Core Engine:** Python (Asynchronous processing, multi-threading)
-- **AI Integration:** Google GenAI SDK (Gemini 2.5 Flash for text and video analysis)
-- **Exchange Gateway:** Bybit V5 API
-- **Data Integrations:** Telethon (Telegram API), Google API Client (Gmail)
-- **Data Persistence:** SQLite3 (Trade Ledgers), JSON (Dynamic configurations)
-- **User Interface:** Flask, HTML5, CSS3, JavaScript (Real-time polling)
-- **Cloud Backup:** Google Cloud Storage (automated nightly snapshots with 7-day retention)
+| Module | Role |
+|:---|:---|
+| `autonomic_engine.py` | Central heartbeat — data fusion, AI evaluation, trade execution, lifecycle management |
+| `bybit_gateway.py` | Exchange API wrapper — orders, positions, WebSocket streams |
+| `circuit_breaker.py` | **[NEW v23]** Consecutive-loss guard — blocks overtrading after repeated failures |
+| `ai_lesson_extractor.py` | Post-trade AI reflection — generates conditional trading rules from closed trades |
+| `gmail_intel_bridge.py` | Gmail OAuth bridge — reads macro analyst reports |
+| `telegram_reader.py` | Async Telegram scraper — community sentiment signals |
+| `bot_memory.py` | SQLite persistence — trades, lessons, decisions, market cache |
+| `dashboard.py` | Flask web server — real-time visual interface |
+| `cloud_backup.py` / `cloud_restore.py` | GCS disaster recovery — nightly snapshots |
+| `version.py` | Centralized version management |
 
 ---
 
-## 🏗️ System Architecture
+## 🛠️ Technology Stack
 
-1. **`autonomic_engine.py`**: The central heartbeat. Manages data fusion, evaluates the Nexus score, executes trades, and updates the ledger.
-2. **`bybit_gateway.py`**: The robust API wrapper handling exchange communication, signature generation, and order execution.
-3. **`gmail_intel_bridge.py` & `telegram_reader.py`**: The external "eyes and ears" gathering unstructured data for AI synthesis.
-4. **`dashboard.py`**: A lightweight web server providing a visual interface for the system's internal state.
-5. **`cloud_backup.py` & `cloud_restore.py`**: Automated disaster recovery — daily snapshots to GCS and one-command full restore.
+- **Core Engine:** Python 3.13 (Asynchronous processing, multi-threading, WebSocket)
+- **AI Integration:** Google GenAI SDK (Gemini 2.5 Pro for decisions, Flash for sentiment)
+- **Exchange Gateway:** Bybit V5 API + WebSocket Private Streams
+- **Data Integrations:** Telethon (Telegram API), Google API Client (Gmail OAuth)
+- **Data Persistence:** SQLite3 (Trade Ledgers, Lessons), Redis (Circuit Breaker state, caching), JSON (Dynamic configs)
+- **User Interface:** Flask, HTML5, CSS3, JavaScript (Real-time polling)
+- **Cloud Backup:** Google Cloud Storage (automated nightly snapshots with 7-day retention)
+- **Hardware:** Raspberry Pi 5 (4GB RAM, 64GB SD)
 
 ---
 

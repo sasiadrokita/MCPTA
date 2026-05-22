@@ -1,4 +1,4 @@
 # Centrally managed version file for Antigravity
-VERSION = "22.3.0"
-CODENAME = "Engine Optimizer"
+VERSION = "23.0.0"
+CODENAME = "Adaptive Intelligence"
 FULL_VERSION = f"v{VERSION} ({CODENAME})"
