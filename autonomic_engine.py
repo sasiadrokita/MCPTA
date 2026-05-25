@@ -1813,9 +1813,22 @@ QUANTITATIVE METRICS:
 - SFP Signal: {sfp_signal if sfp_signal else 'None'} {"← HIGH CONVICTION reversal signal" if sfp_signal else ""}
 - BTC/ETH Sync: {symmetry_desc}
 
-TECHNICAL (15m):
-- Price: {current_price:.4f} | RSI: {rsi:.2f} {"⚠️ OVERSOLD" if rsi < 30 else "⚠️ OVERBOUGHT" if rsi > 70 else ""} | ATR: {atr:.4f}
-- EMA: {ema:.4f} {"(price above EMA → bullish bias)" if current_price > ema else "(price below EMA → bearish bias)"}
+TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
+
+[15m — Entry Timeframe]
+- Price: {current_price:.4f} | RSI: {rsi:.2f} {"⚠️ OVERSOLD" if rsi < 30 else "⚠️ OVERBOUGHT" if rsi > 70 else "✅ Neutral"} | ATR: {atr:.4f}
+- EMA({params['ema_period']}): {ema:.4f} {"↑ price ABOVE EMA (bullish 15m)" if current_price > ema else "↓ price BELOW EMA (bearish 15m)"}
+- Regime: {market_regime} | ADX: {adx:.2f} {"⚠️ WEAK TREND — avoid new entries" if adx < 20 else "✅ TREND CONFIRMED"}
+
+[1H — Swing Context]
+- EMA(1H): {ema_1h:.4f} {"↑ bullish 1H trend" if current_price > ema_1h > 0 else "↓ bearish 1H trend" if ema_1h > 0 else "N/A"}
+- RSI(1H): {rsi_1h:.2f} {"⚠️ OVERSOLD 1H" if rsi_1h < 35 else "⚠️ OVERBOUGHT 1H" if rsi_1h > 65 else ""}
+
+[4H — Macro Structure]
+- EMA(4H): {macro_ema:.4f} {"↑ MACRO BULLISH (price > 4H EMA)" if macro_trend_bullish else "↓ MACRO BEARISH (price < 4H EMA)"}
+
+[Multi-TF Alignment]
+{"✅ ALL BULLISH — 15m+1H+4H aligned UP: strong LONG confirmation" if (current_price > ema and current_price > ema_1h and macro_trend_bullish) else "🔴 ALL BEARISH — 15m+1H+4H aligned DOWN: strong SHORT confirmation" if (current_price < ema and current_price < ema_1h and not macro_trend_bullish) else "⚠️ MIXED TIMEFRAMES — DO NOT force a trade, wait for alignment or rely on strongest signal"}
 
 NEXUS INTELLIGENCE:
 - Macro Bias: {nexus_state.get('macro_bias', 'NEUTRAL')} | Score: {nexus_state.get('nexus_score', 5.0)}/10
