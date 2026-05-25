@@ -184,19 +184,54 @@ def save_lesson(symbol: str, rule_if: str, rule_then: str,
     except Exception as e:
         print(f"[MEMORY] save_lesson error: {e}")
 
-def get_recent_lessons(symbol: str, limit: int = 5) -> list[dict]:
-    """Returns recent lessons for a symbol to inject into the prompt."""
+def get_recent_lessons(symbol: str, limit: int = 5, current_regime: str = None) -> list[dict]:
+    """Returns lessons for a symbol, prioritising those matching the current market regime.
+
+    If current_regime is provided (e.g. 'TREND_DOWN'), regime-matching lessons are
+    returned first, then remaining slots are filled with the most recent general lessons.
+    This prevents the bot from receiving TREND_UP lessons when trading in TREND_DOWN.
+    """
     try:
         with _get_conn() as conn:
-            rows = conn.execute(
-                "SELECT rule_if, rule_then, rule_because FROM lessons "
-                "WHERE symbol=? ORDER BY id DESC LIMIT ?",
-                (symbol, limit)
-            ).fetchall()
-            return [dict(r) for r in rows]
+            if current_regime:
+                # Priority 1: lessons matching current regime keyword
+                matched = conn.execute(
+                    "SELECT rule_if, rule_then, rule_because FROM lessons "
+                    "WHERE symbol=? AND rule_if LIKE ? ORDER BY id DESC LIMIT ?",
+                    (symbol, f"%{current_regime}%", limit)
+                ).fetchall()
+                matched_list = [dict(r) for r in matched]
+
+                # Priority 2: fill remaining slots with other recent lessons
+                remaining = limit - len(matched_list)
+                if remaining > 0:
+                    general = conn.execute(
+                        "SELECT rule_if, rule_then, rule_because FROM lessons "
+                        "WHERE symbol=? AND rule_if NOT LIKE ? ORDER BY id DESC LIMIT ?",
+                        (symbol, f"%{current_regime}%", remaining)
+                    ).fetchall()
+                    matched_list.extend([dict(r) for r in general])
+
+                if matched_list:
+                    regime_count = len([r for r in matched_list if current_regime in r.get('rule_if', '')])
+                    print(
+                        f"[MEMORY] Lessons for {symbol}: {len(matched_list)} total "
+                        f"({regime_count} matching regime '{current_regime}')",
+                        flush=True
+                    )
+                return matched_list
+            else:
+                # Fallback: no regime context — return most recent
+                rows = conn.execute(
+                    "SELECT rule_if, rule_then, rule_because FROM lessons "
+                    "WHERE symbol=? ORDER BY id DESC LIMIT ?",
+                    (symbol, limit)
+                ).fetchall()
+                return [dict(r) for r in rows]
     except Exception as e:
         print(f"[MEMORY] get_recent_lessons error: {e}")
         return []
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # REDIS CACHE

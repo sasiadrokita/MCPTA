@@ -1761,17 +1761,18 @@ def evaluate_market_condition(symbol, current_price):
             
             ai_lessons_text = "No historical lessons for this instrument."
             if BOT_MEMORY_OK:
-                recent_lessons = bot_memory.get_recent_lessons(symbol, limit=5)
+                # Pass current regime so memory returns regime-matched lessons first
+                recent_lessons = bot_memory.get_recent_lessons(symbol, limit=5, current_regime=market_regime)
                 if recent_lessons:
+                    regime_matched = [l for l in recent_lessons if market_regime in l.get('rule_if', '')]
                     rules_str = "\n".join([
-                        f"  [{i+1}] ONLY IF: {l['rule_if']}\n       → THEN: {l['rule_then']}\n       WHY: {l['rule_because']}"
+                        f"  [{i+1}]{'★ REGIME MATCH' if market_regime in l.get('rule_if','') else ''} ONLY IF: {l['rule_if']}\n       → THEN: {l['rule_then']}\n       WHY: {l['rule_because']}"
                         for i, l in enumerate(recent_lessons)
                     ])
                     ai_lessons_text = (
-                        f"CONDITIONAL LESSONS FROM PAST TRADES (apply ONLY when the exact market conditions match):\n"
+                        f"CONDITIONAL LESSONS — pre-filtered for current regime '{market_regime}' ({len(regime_matched)}/{len(recent_lessons)} are direct matches, marked ★):\n"
                         f"{rules_str}\n"
-                        f"IMPORTANT: These rules are NOT universal. Each rule is tied to a specific market constellation. "
-                        f"Check if current conditions (regime, RSI, ADX, nexus, SFP) MATCH the rule's condition before applying it."
+                        f"★ REGIME MATCH lessons are HIGHLY RELEVANT — current conditions match them directly. Treat them as strong signals."
                     )
 
             prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
@@ -1889,13 +1890,25 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                 # Guard: No dual positions
                 if GLOBAL_STATE['open_trades'].get(symbol, {}).get("active", False):
                     return
-                # --- CIRCUIT BREAKER CHECK ---
+                # --- CIRCUIT BREAKER CHECK (per-side AND per-symbol) ---
                 if CIRCUIT_BREAKER_OK:
+                    # Check specific side
                     blocked, cb_reason = circuit_breaker.is_blocked(symbol, ai_action)
                     if blocked:
                         print(f"[{symbol}] 🔴 {cb_reason}", flush=True)
                         send_telegram_message(f"🔴 *[{symbol}] CIRCUIT BREAKER*\n`{cb_reason}`")
                         return
+                    # Also check opposite side — if bot keeps flipping LONG↔SHORT on same symbol
+                    opposite = "SHORT" if ai_action == "LONG" else "LONG"
+                    opp_blocked, opp_reason = circuit_breaker.is_blocked(symbol, opposite)
+                    cb_status = circuit_breaker.get_status()
+                    long_losses = cb_status.get(f"{symbol}_LONG", {}).get("consecutive_losses", 0)
+                    short_losses = cb_status.get(f"{symbol}_SHORT", {}).get("consecutive_losses", 0)
+                    total_recent_losses = long_losses + short_losses
+                    if total_recent_losses >= 4:
+                        print(f"[{symbol}] ⚠️  SYMBOL FATIGUE: {total_recent_losses} combined recent losses (LONG:{long_losses} + SHORT:{short_losses}). Reducing scale.", flush=True)
+                        # Force scale down — inject caution (don't block, but warn AI)
+                        ai_scale = min(ai_scale, 0.3)
                 signal_dir = ai_action
             elif ai_action == "EXIT" and is_revaluation:
                 # Early Exit implementation
