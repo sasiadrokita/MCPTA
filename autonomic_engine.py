@@ -1787,6 +1787,13 @@ Every decision you make must be evaluated through one lens: "Will this increase 
 - A bad trade IS a loss, even if the reasoning seemed logical.
 - You have learned from {len(bot_memory.get_recent_lessons(symbol, limit=100) if BOT_MEMORY_OK else [])} past trades on {symbol}. USE that knowledge.
 
+═══════════════════════════════════════════════════════
+CRITICAL HARD FILTERS (KILL-SWITCHES) — NON-NEGOTIABLE:
+You MUST return "action": "HOLD" and abort the trade if ANY of the following are true:
+1. CHOP / WEAK TREND: If Regime is 'VOLATILE_CHOP' OR ('RANGE_BOUND' and ADX < 20) -> RETURN HOLD.
+2. LESSON OVERRIDE: If any CONDITIONAL LESSON (★ REGIME MATCH) says "AVOID LONG" and you consider LONG -> RETURN HOLD. Same for SHORT.
+3. ORDER BOOK / CVD CONTRADICTION: If considering LONG but Order Book Imbalance is 'ASKS', or considering SHORT but 'BIDS' -> RETURN HOLD.
+
 You have access to the following intelligence sources — use ALL of them:
   1. ELLIOTT WAVE: structural market geometry, wave position, expected next move
   2. MARKET REGIME + ADX: is there a real trend? (ADX < 20 = chop, avoid new entries)
@@ -1812,6 +1819,7 @@ QUANTITATIVE METRICS:
 - Regime: {market_regime} | ADX: {adx:.2f} {"⚠️ WEAK TREND - be cautious with new entries" if adx < 20 else "✅ TREND CONFIRMED"}
 - SFP Signal: {sfp_signal if sfp_signal else 'None'} {"← HIGH CONVICTION reversal signal" if sfp_signal else ""}
 - BTC/ETH Sync: {symmetry_desc}
+- Order Book Imbalance: {order_book_impact}
 
 TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
 
