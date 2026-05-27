@@ -1967,13 +1967,14 @@ ACTIVE POSITION ON {symbol}:
 {active_trade_str}
 
 ═══════════════════════════════════════════════════════
-RISK MANAGEMENT (AUTONOMOUS):
-- You have full control over SL/TP placement based on the specific setup (e.g., SFP wicks, recent swing lows/highs).
+RISK MANAGEMENT — HARD RULES:
+- ⚠️ SL MUST be at least {atr:.4f} (1 ATR) away from entry. NEVER place SL closer than this. If your structural level is tighter than 1 ATR, DO NOT take the trade.
+- TP MUST give a Risk:Reward ratio of at least 2.0. If R:R < 2.0, DO NOT take the trade.
 - {rm_guideline}
-- Ensure your TP gives a Risk:Reward of at least 1.5 (aim for 2.0+ on high conviction).
-- For HIGH-CONVICTION setups aim for TP at 3.0x–4.0x ATR (R:R 2.0+).
+- Recommended SL placement: behind the most recent swing low/high or SFP wick, typically 1.5–2.5x ATR from entry.
+- Recommended TP placement: at the next structural resistance/support, typically 2.0–4.0x ATR from entry.
 - `scale`: 0.3-0.5 for uncertain setups, 0.7-1.0 for high confluence.
-- Leverage: 3-5x uncertain, 7-10x only for high-conviction setups.
+- Leverage: 2-3x default, 5x MAXIMUM only for SFP-confirmed high-conviction setups.
 - HOLD is a valid and often optimal action — do NOT force trades in ambiguous conditions.
 
 Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": float, "scale": 0.1-1.0, "leverage": int, "wave_analysis": "short_desc", "reason": "string"}}
@@ -2086,12 +2087,12 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                     risk_dist = abs(current_price - sl_price)
 
                     if not is_test_mission:
-                        # === AUTONOMOUS SL/TP BOUNDS (Basic Sanity Checks Only) ===
-                        # We give the AI full autonomy, only blocking absurd hallucinations (>10% or <0.1% risk)
-                        max_allowed_risk = current_price * 0.10
-                        min_allowed_risk = current_price * 0.001
+                        # === v23.8 SL/TP ENFORCEMENT (ATR-based floors) ===
+                        max_allowed_risk = current_price * 0.10  # Cap: 10% max
+                        min_sl_distance = atr * 1.0               # Floor: 1.0x ATR minimum
+                        min_rr = 2.0                              # Minimum Risk:Reward ratio
 
-                        # --- SL CAP (Absurdly wide) ---
+                        # --- SL CAP (Absurdly wide → 10% max) ---
                         if risk_dist > max_allowed_risk:
                             old_sl = sl_price
                             sl_price = round(
@@ -2099,41 +2100,50 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                                 price_precision
                             )
                             risk_dist = abs(current_price - sl_price)
-                            print(f"[{symbol}] SL SANITY CAP: AI hallucinated SL > 10%. Corrected {old_sl} → {sl_price}", flush=True)
+                            print(f"[{symbol}] SL CAP: {old_sl} → {sl_price} (was > 10%)", flush=True)
 
-                        # --- SL FLOOR (Absurdly tight) ---
-                        if risk_dist < min_allowed_risk:
+                        # --- SL FLOOR (Must be at least 1.0x ATR from entry) ---
+                        if risk_dist < min_sl_distance:
                             old_sl = sl_price
                             sl_price = round(
-                                current_price - min_allowed_risk if signal_dir == "LONG" else current_price + min_allowed_risk,
+                                current_price - min_sl_distance if signal_dir == "LONG" else current_price + min_sl_distance,
                                 price_precision
                             )
                             risk_dist = abs(current_price - sl_price)
-                            print(f"[{symbol}] SL SANITY FLOOR: AI hallucinated SL < 0.1%. Corrected {old_sl} → {sl_price}", flush=True)
+                            print(
+                                f"[{symbol}] SL ATR FLOOR: {old_sl} → {sl_price} "
+                                f"(AI placed SL at {abs(current_price - old_sl)/atr:.2f}x ATR, enforced to 1.0x ATR = {min_sl_distance:.4f})",
+                                flush=True
+                            )
 
-                        # --- TP FLOOR (ensures minimum R:R = 1.5) ---
-                        # --- TP FLOOR (Basic Sanity Check: R:R >= 0.5) ---
+                        # --- TP FLOOR (Must give R:R >= 2.0) ---
                         reward_dist = abs(tp_price - current_price)
-                        if reward_dist < (risk_dist * 0.5):
+                        if risk_dist > 0 and reward_dist < (risk_dist * min_rr):
                             old_tp = tp_price
                             tp_price = round(
-                                current_price + (risk_dist * 0.5) if signal_dir == "LONG" else current_price - (risk_dist * 0.5),
+                                current_price + (risk_dist * min_rr) if signal_dir == "LONG" else current_price - (risk_dist * min_rr),
                                 price_precision
                             )
                             reward_dist = abs(tp_price - current_price)
-                            rr_actual = reward_dist / risk_dist if risk_dist > 0 else 0
+                            rr_actual = reward_dist / risk_dist
                             print(
-                                f"[{symbol}] TP SANITY FLOOR: {old_tp} → {tp_price} "
-                                f"(Forced min R:R=0.5, actual={rr_actual:.2f})",
+                                f"[{symbol}] TP R:R FLOOR: {old_tp} → {tp_price} "
+                                f"(Enforced min R:R={min_rr}, actual={rr_actual:.2f})",
                                 flush=True
                             )
                         else:
                             rr_actual = reward_dist / risk_dist if risk_dist > 0 else 0
-                            print(
-                                f"[{symbol}] SL/TP OK: SL={risk_dist/current_price*100:.3f}% ({risk_dist/atr:.2f}x ATR), "
-                                f"TP={reward_dist/current_price*100:.3f}% ({reward_dist/atr:.2f}x ATR), R:R={rr_actual:.2f}",
-                                flush=True
-                            )
+
+                        # --- LEVERAGE CAP (max x5) ---
+                        if ai_leverage > 5:
+                            print(f"[{symbol}] LEVERAGE CAP: {ai_leverage}x → 5x", flush=True)
+                            ai_leverage = 5
+
+                        print(
+                            f"[{symbol}] FINAL SL/TP: SL={risk_dist/current_price*100:.3f}% ({risk_dist/atr:.2f}x ATR), "
+                            f"TP={reward_dist/current_price*100:.3f}% ({reward_dist/atr:.2f}x ATR), R:R={rr_actual:.2f}, Lev=x{ai_leverage}",
+                            flush=True
+                        )
 
                     if risk_dist > 0:
                         raw_qty = (risk_amount / risk_dist) * ai_scale
