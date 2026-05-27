@@ -423,6 +423,145 @@ def calculate_rsi(prices, period=14):
     rs = avg_gain / avg_loss
     return 100.0 - (100.0 / (1.0 + rs))
 
+def calculate_rsi_array(prices, period=14):
+    if len(prices) < period + 1:
+        return [50.0] * len(prices)
+    
+    rsi_list = [50.0] * period
+    gains = []
+    losses = []
+    
+    for i in range(1, period + 1):
+        change = prices[i] - prices[i-1]
+        gains.append(max(0, change))
+        losses.append(max(0, -change))
+        
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
+    
+    if avg_loss == 0:
+        rsi_list.append(100.0)
+    else:
+        rs = avg_gain / avg_loss
+        rsi_list.append(100.0 - (100.0 / (1.0 + rs)))
+        
+    for i in range(period + 1, len(prices)):
+        change = prices[i] - prices[i-1]
+        gain = max(0, change)
+        loss = max(0, -change)
+        
+        avg_gain = (avg_gain * (period - 1) + gain) / period
+        avg_loss = (avg_loss * (period - 1) + loss) / period
+        
+        if avg_loss == 0:
+            rsi_list.append(100.0)
+        else:
+            rs = avg_gain / avg_loss
+            rsi_list.append(100.0 - (100.0 / (1.0 + rs)))
+            
+    return rsi_list
+
+def calculate_macd(prices, fast_period=12, slow_period=26, signal_period=9):
+    if len(prices) < slow_period + signal_period:
+        return {'macd': 0, 'signal': 0, 'hist': 0, 'hist_slope': 'FLAT'}
+        
+    def _ema(data, period):
+        emas = [sum(data[:period]) / period]
+        multiplier = 2 / (period + 1)
+        for p in data[period:]:
+            emas.append((p - emas[-1]) * multiplier + emas[-1])
+        return emas
+
+    fast_emas = _ema(prices, fast_period)
+    slow_emas = _ema(prices, slow_period)
+    
+    start_idx = slow_period - fast_period
+    fast_emas = fast_emas[start_idx:]
+    
+    macd_line = [f - s for f, s in zip(fast_emas, slow_emas)]
+    signal_line = _ema(macd_line, signal_period)
+    
+    macd_line = macd_line[signal_period - 1:]
+    hist = [m - s for m, s in zip(macd_line, signal_line)]
+    
+    if len(hist) >= 2:
+        slope = "RISING (Bullish Momentum)" if hist[-1] > hist[-2] else "FALLING (Bearish Momentum)"
+    else:
+        slope = "FLAT"
+        
+    return {
+        'macd': macd_line[-1],
+        'signal': signal_line[-1],
+        'hist': hist[-1],
+        'hist_slope': slope
+    }
+
+def detect_divergences(klines, period=14):
+    if len(klines) < period * 2:
+        return "NONE"
+        
+    closes = [float(k['close']) for k in klines]
+    highs = [float(k['high']) for k in klines]
+    lows = [float(k['low']) for k in klines]
+    rsis = calculate_rsi_array(closes, period)
+    
+    peaks = []
+    troughs = []
+    
+    for i in range(period, len(closes)-2):
+        if highs[i] > highs[i-1] and highs[i] > highs[i-2] and highs[i] > highs[i+1] and highs[i] > highs[i+2]:
+            peaks.append(i)
+        if lows[i] < lows[i-1] and lows[i] < lows[i-2] and lows[i] < lows[i+1] and lows[i] < lows[i+2]:
+            troughs.append(i)
+            
+    div_signal = "NONE"
+    
+    if len(peaks) >= 2:
+        p1, p2 = peaks[-2], peaks[-1]
+        if (len(closes) - p2) <= 15:
+            if highs[p2] > highs[p1] and rsis[p2] < rsis[p1] - 2:
+                div_signal = "🔴 BEARISH DIVERGENCE (Price High, RSI Low)"
+                
+    if len(troughs) >= 2:
+        t1, t2 = troughs[-2], troughs[-1]
+        if (len(closes) - t2) <= 15:
+            if lows[t2] < lows[t1] and rsis[t2] > rsis[t1] + 2:
+                div_signal = "🟢 BULLISH DIVERGENCE (Price Low, RSI High)"
+                
+    return div_signal
+
+def analyze_price_action_structure(klines, depth=3):
+    swings = get_swing_points(klines, depth=depth)
+    if len(swings) < 4:
+        return "Insufficient structure data"
+        
+    peaks = [s['price'] for s in swings if s['type'] == 'PEAK']
+    troughs = [s['price'] for s in swings if s['type'] == 'TROUGH']
+    
+    desc = []
+    if len(peaks) >= 2:
+        if peaks[-1] > peaks[-2]:
+            desc.append("Higher Highs (HH)")
+        else:
+            desc.append("Lower Highs (LH)")
+            
+    if len(troughs) >= 2:
+        if troughs[-1] > troughs[-2]:
+            desc.append("Higher Lows (HL)")
+        else:
+            desc.append("Lower Lows (LL)")
+            
+    if "Higher Highs (HH)" in desc and "Higher Lows (HL)" in desc:
+        return "BULLISH STRUCTURE (HH, HL) - Uptrend confirmed."
+    elif "Lower Highs (LH)" in desc and "Lower Lows (LL)" in desc:
+        return "BEARISH STRUCTURE (LH, LL) - Downtrend confirmed."
+    elif "Lower Highs (LH)" in desc and "Higher Lows (HL)" in desc:
+        return "CONSOLIDATION (LH, HL) - Symmetrical Triangle / Squeeze."
+    elif "Higher Highs (HH)" in desc and "Lower Lows (LL)" in desc:
+        return "EXPANDING VOLATILITY (HH, LL) - Megaphone pattern, unsafe."
+    
+    return "MIXED STRUCTURE - No clear trend."
+
 def calculate_atr(klines, period=14):
     if len(klines) < period + 1:
         return 0.0
@@ -1693,9 +1832,10 @@ def evaluate_market_condition(symbol, current_price):
             else:
                 channel_signal_text = "No signal in the last hour"
 
-        # Elliott Wave "Numerical Vision" (Swing Points)
-        swing_points = get_swing_points(klines, depth=5)
-        swings_desc = " | ".join([f"{s['type']}: {s['price']:.2f}" for s in swing_points]) if swing_points else "No clear turning points (Chop)."
+        # Structural Price Action, MACD and Divergences
+        structure_desc = analyze_price_action_structure(klines, depth=3)
+        macd_data = calculate_macd([float(k['close']) for k in klines])
+        divergence_signal = detect_divergences(klines)
 
         # Structural Macro Memory
         # V21.10.0: Elliott Wave TTL - expire context older than 4 hours
@@ -1811,9 +1951,11 @@ PORTFOLIO STATE:
 ═══════════════════════════════════════════════════════
 INSTRUMENT: {symbol}
 
-MARKET STRUCTURE (Elliott Wave):
-- Wave Context: {macro_context}
-- Swing Points: {swings_desc}
+MARKET STRUCTURE & MOMENTUM (15m):
+- Wave Context (Macro): {macro_context}
+- Local Structure: {structure_desc}
+- MACD Momentum: {macd_data['hist_slope']} (MACD: {macd_data['macd']:.4f}, Signal: {macd_data['signal']:.4f})
+- Divergence: {divergence_signal}
 
 QUANTITATIVE METRICS:
 - Regime: {market_regime} | ADX: {adx:.2f} {"⚠️ WEAK TREND - be cautious with new entries" if adx < 20 else "✅ TREND CONFIRMED"}
