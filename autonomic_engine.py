@@ -1915,6 +1915,14 @@ def evaluate_market_condition(symbol, current_price):
                         f"★ REGIME MATCH lessons are HIGHLY RELEVANT — current conditions match them directly. Treat them as strong signals."
                     )
 
+            long_sl_min = current_price - (atr * 1.5)
+            long_sl_max = current_price - (atr * 3.0)
+            long_tp_min = current_price + (atr * 2.25)
+            
+            short_sl_min = current_price + (atr * 1.5)
+            short_sl_max = current_price + (atr * 3.0)
+            short_tp_min = current_price - (atr * 2.25)
+
             prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
 
 ╔══════════════════════════════════════════════════════╗
@@ -1995,8 +2003,8 @@ ACTIVE POSITION ON {symbol}:
 ═══════════════════════════════════════════════════════
 RISK MANAGEMENT (NON-NEGOTIABLE):
 - SL/TP are VALIDATED against the current ATR ({atr:.4f} on 15m).
-- SL range: 1.5x–3.0x ATR from entry = [{atr*1.5:.4f}, {atr*3.0:.4f}] — place SL WITHIN this range.
-- TP minimum: 2.25x ATR from entry = {atr*2.25:.4f} — ensures R:R ≥ 1.5.
+- If LONG: SL must be between {long_sl_max:.4f} and {long_sl_min:.4f}. Minimum TP is {long_tp_min:.4f}.
+- If SHORT: SL must be between {short_sl_min:.4f} and {short_sl_max:.4f}. Minimum TP is {short_tp_min:.4f}.
 - For HIGH-CONVICTION setups aim for TP at 3.0x–4.0x ATR (R:R 2.0+).
 - `scale`: 0.3-0.5 for uncertain setups, 0.7-1.0 for high confluence.
 - Leverage: 3-5x uncertain, 7-10x only for high-conviction setups.
