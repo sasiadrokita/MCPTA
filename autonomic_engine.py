@@ -260,9 +260,6 @@ def sync_server_time():
     except Exception as e:
         print(f"[{version.VERSION}] Time error: {e}", flush=True)
 
-def sign_request(query_string):
-    return hmac.new(SECRET_KEY.encode(), query_string.encode(), hashlib.sha256).hexdigest()
-
 def binance_request(endpoint, query_string="", method='GET', silent=False):
     # --- MOCKED BINANCE ADAPTER FOR BYBIT DASHBOARD COMPATIBILITY ---
     try:
@@ -877,18 +874,8 @@ def fire_bridge(symbol, order_id, side, sl, tp, qty):
     }
     
     emoji = "🟢" if side == "BUY" else "🔴"
-    send_telegram_message(f"{emoji} *[{symbol}] POSITION OPENED*\n*Entry:* `{approx_entry}`\n*SL:* `{nowy_sl}`\n*TP:* `{tp_price}`")
-    
-    # Execution confirmation on Telegram (missing notification)
-    emoji = "🟢" if side == "BUY" else "🔴"
     dir_text = "LONG" if side == "BUY" else "SHORT"
-    tg_msg = (f"{emoji} *[{symbol}] POSITION OPENED ({dir_text})*\n"
-              f"*Entry Price:* `{approx_entry}`\n"
-              f"*SL:* `{nowy_sl}`\n"
-              f"*TP1 (50%):* `{tp_1}`\n"
-              f"*TP2 (50%):* `{tp_2}`\n"
-              f"*Qty:* `{qty}`")
-    send_telegram_message(tg_msg)
+    send_telegram_message(f"{emoji} *[{symbol}] POSITION OPENED ({dir_text})*\n*Entry:* `{approx_entry}`\n*SL:* `{nowy_sl}`\n*TP:* `{tp_price}`\n*Qty:* `{qty}`")
     
     print(f"[{symbol}] Position successfully executed. Trailing started.")
 
@@ -1243,7 +1230,10 @@ def update_trailing_stop(symbol, current_price, params, atr):
         if not trade["algo_id"]:
             if current_price <= ideal_sl:
                  trade["active"] = False
-                 binance_request('/fapi/v1/order', f"symbol={symbol}&side=SELL&type=MARKET&quantity={trade['qty']}&reduceOnly=true", method='POST')
+                 exit_side = 'SELL' if trade['side'] == 'BUY' else 'BUY'
+                 cancel_all_orders(symbol)
+                 place_market_order(symbol, exit_side, trade['qty'], reduce_only=True)
+                 print(f"[{symbol}] EMERGENCY SL HIT (no algo_id). Closed via market order.", flush=True)
                  return
             final_sl = min(ideal_sl, safe_sl)
             needs_update = True
@@ -1252,17 +1242,8 @@ def update_trailing_stop(symbol, current_price, params, atr):
             # SAFETY: NEVER downgrade the SL in a BUY trade
             theoretical_sl = max(theoretical_sl, old_sl)
             
-            # Check if physical SL quantity matches our memory state
-            curr_qty = trade['qty']
-            phys_algo = binance_request('/fapi/v1/openAlgoOrders', f"symbol={symbol}", silent=True)
-            qty_mismatch = False
-            if isinstance(phys_algo, list) and len(phys_algo) > 0:
-                phys_qty = float(phys_algo[0].get('quantity', 0))
-                if abs(phys_qty - curr_qty) > 1e-9:
-                    qty_mismatch = True
-            
             nowy_sl = min(theoretical_sl, safe_sl)
-            if force_update or qty_mismatch or (nowy_sl > (old_sl + 1e-9) and (nowy_sl - old_sl) / (old_sl if old_sl > 0 else 1) > 0.0005):
+            if force_update or (nowy_sl > (old_sl + 1e-9) and (nowy_sl - old_sl) / (old_sl if old_sl > 0 else 1) > 0.0005):
                 final_sl = nowy_sl
                 needs_update = True
 
@@ -1473,21 +1454,6 @@ def on_error(ws, error):
     print(f"WebSocket Error: {error}", flush=True)
     traceback.print_exc()
 
-def on_close(ws, close_status_code, close_msg):
-    print("WebSocket connection closed. Reconnect in 5 seconds...", flush=True)
-
-def on_open(ws):
-    print("[WSS] Connected to exchange streams.", flush=True)
-    params = [f"{sym.lower()}@kline_{INTERVAL}" for sym in SYMBOLS]
-    if GLOBAL_STATE['listen_key']:
-        params.append(GLOBAL_STATE['listen_key'])
-    subscribe_message = {
-        "method": "SUBSCRIBE",
-        "params": params,
-        "id": 1
-    }
-    ws.send(json.dumps(subscribe_message))
-
 def get_swing_points(klines, depth=5):
     """
     Identifies local peaks and troughs (Pivots) for Elliott Wave structure analysis.
@@ -1682,14 +1648,14 @@ def evaluate_market_condition(symbol, current_price):
             volatile = atr_ratio > 1.35 or bb_width > 0.04
             bullish = current_price > ema
 
-            if trending and volatile:
-                market_regime = "VOLATILE_CHOP"   # strong moves but unpredictable — stay out
+            if not trending and volatile:
+                market_regime = "VOLATILE_CHOP"   # no direction + high volatility = true chop — stay out
             elif trending and bullish:
                 market_regime = "TREND_UP"
             elif trending and not bullish:
                 market_regime = "TREND_DOWN"
             else:
-                market_regime = "RANGE_BOUND"     # ADX < 22, no clear direction
+                market_regime = "RANGE_BOUND"     # ADX < 22, low volatility — no clear direction
 
             print(
                 f"[{symbol}] REGIME: {market_regime} "
@@ -1916,7 +1882,6 @@ def evaluate_market_condition(symbol, current_price):
                     )
         
             # Calculate basic ATR references for the prompt (as guidelines, not strict limits)
-            atr_ref_sl_tight = atr * 1.0
             atr_ref_sl_wide = atr * 2.5
             
             if market_regime == "VOLATILE_CHOP":

@@ -1,4 +1,4 @@
 # Centrally managed version file for Antigravity
-VERSION = "23.6.0"
-CODENAME = "Adaptive Autonomy"
+VERSION = "23.7.0"
+CODENAME = "Structural Overhaul"
 FULL_VERSION = f"v{VERSION} ({CODENAME})"
