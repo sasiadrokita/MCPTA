@@ -1924,7 +1924,7 @@ def evaluate_market_condition(symbol, current_price):
         else:
             rm_guideline = f"Standard ATR is {atr:.4f}. You have full autonomy to place SL behind structural wicks (SFP) or recent swings."
 
-            prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
+        prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
 
 ╔══════════════════════════════════════════════════════╗
 ║  PRIME DIRECTIVE: MAKE MONEY. PROTECT CAPITAL.      ║
