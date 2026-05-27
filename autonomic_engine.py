@@ -1915,16 +1915,16 @@ def evaluate_market_condition(symbol, current_price):
                         f"★ REGIME MATCH lessons are HIGHLY RELEVANT — current conditions match them directly. Treat them as strong signals."
                     )
         
-        # Calculate basic ATR references for the prompt (as guidelines, not strict limits)
-        atr_ref_sl_tight = atr * 1.0
-        atr_ref_sl_wide = atr * 2.5
-        
-        if market_regime == "VOLATILE_CHOP":
-            rm_guideline = f"Market is CHOPPY. If you must trade, use a wider SL (e.g. ~{atr_ref_sl_wide:.4f} distance) and scale down."
-        else:
-            rm_guideline = f"Standard ATR is {atr:.4f}. You have full autonomy to place SL behind structural wicks (SFP) or recent swings."
+            # Calculate basic ATR references for the prompt (as guidelines, not strict limits)
+            atr_ref_sl_tight = atr * 1.0
+            atr_ref_sl_wide = atr * 2.5
+            
+            if market_regime == "VOLATILE_CHOP":
+                rm_guideline = f"Market is CHOPPY. If you must trade, use a wider SL (e.g. ~{atr_ref_sl_wide:.4f} distance) and scale down."
+            else:
+                rm_guideline = f"Standard ATR is {atr:.4f}. You have full autonomy to place SL behind structural wicks (SFP) or recent swings."
 
-        prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
+            prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
 
 ╔══════════════════════════════════════════════════════╗
 ║  PRIME DIRECTIVE: MAKE MONEY. PROTECT CAPITAL.      ║
