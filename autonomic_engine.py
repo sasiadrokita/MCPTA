@@ -1914,14 +1914,15 @@ def evaluate_market_condition(symbol, current_price):
                         f"{rules_str}\n"
                         f"★ REGIME MATCH lessons are HIGHLY RELEVANT — current conditions match them directly. Treat them as strong signals."
                     )
-
-            long_sl_min = current_price - (atr * 1.5)
-            long_sl_max = current_price - (atr * 3.0)
-            long_tp_min = current_price + (atr * 2.25)
-            
-            short_sl_min = current_price + (atr * 1.5)
-            short_sl_max = current_price + (atr * 3.0)
-            short_tp_min = current_price - (atr * 2.25)
+        
+        # Calculate basic ATR references for the prompt (as guidelines, not strict limits)
+        atr_ref_sl_tight = atr * 1.0
+        atr_ref_sl_wide = atr * 2.5
+        
+        if market_regime == "VOLATILE_CHOP":
+            rm_guideline = f"Market is CHOPPY. If you must trade, use a wider SL (e.g. ~{atr_ref_sl_wide:.4f} distance) and scale down."
+        else:
+            rm_guideline = f"Standard ATR is {atr:.4f}. You have full autonomy to place SL behind structural wicks (SFP) or recent swings."
 
             prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
 
@@ -2001,10 +2002,10 @@ ACTIVE POSITION ON {symbol}:
 {active_trade_str}
 
 ═══════════════════════════════════════════════════════
-RISK MANAGEMENT (NON-NEGOTIABLE):
-- SL/TP are VALIDATED against the current ATR ({atr:.4f} on 15m).
-- If LONG: SL must be between {long_sl_max:.4f} and {long_sl_min:.4f}. Minimum TP is {long_tp_min:.4f}.
-- If SHORT: SL must be between {short_sl_min:.4f} and {short_sl_max:.4f}. Minimum TP is {short_tp_min:.4f}.
+RISK MANAGEMENT (AUTONOMOUS):
+- You have full control over SL/TP placement based on the specific setup (e.g., SFP wicks, recent swing lows/highs).
+- {rm_guideline}
+- Ensure your TP gives a Risk:Reward of at least 1.5 (aim for 2.0+ on high conviction).
 - For HIGH-CONVICTION setups aim for TP at 3.0x–4.0x ATR (R:R 2.0+).
 - `scale`: 0.3-0.5 for uncertain setups, 0.7-1.0 for high confluence.
 - Leverage: 3-5x uncertain, 7-10x only for high-conviction setups.
@@ -2120,58 +2121,45 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                     risk_dist = abs(current_price - sl_price)
 
                     if not is_test_mission:
-                        # === ATR-BASED DYNAMIC SL/TP BOUNDS ===
-                        # ATR represents actual market noise on this timeframe.
-                        # SL must be outside noise (min 1.5x ATR) but not too capital-hungry (max 3.0x ATR).
-                        # TP must be at least 2.25x ATR to ensure minimum R:R of 1.5.
+                        # === AUTONOMOUS SL/TP BOUNDS (Basic Sanity Checks Only) ===
+                        # We give the AI full autonomy, only blocking absurd hallucinations (>10% or <0.1% risk)
+                        max_allowed_risk = current_price * 0.10
+                        min_allowed_risk = current_price * 0.001
 
-                        atr_sl_min = atr * 1.5   # minimum SL: just outside noise
-                        atr_sl_max = atr * 3.0   # maximum SL: capital protection cap
-                        atr_tp_min = atr * 2.25  # minimum TP: guarantees R:R >= 1.5 vs 1.5x ATR SL
-
-                        atr_pct = atr / current_price * 100
-
-                        # --- SL CAP (too wide — wastes capital) ---
-                        if risk_dist > atr_sl_max:
+                        # --- SL CAP (Absurdly wide) ---
+                        if risk_dist > max_allowed_risk:
                             old_sl = sl_price
                             sl_price = round(
-                                current_price - atr_sl_max if signal_dir == "LONG" else current_price + atr_sl_max,
+                                current_price - max_allowed_risk if signal_dir == "LONG" else current_price + max_allowed_risk,
                                 price_precision
                             )
                             risk_dist = abs(current_price - sl_price)
-                            print(
-                                f"[{symbol}] SL CAP (ATR): {old_sl} → {sl_price} "
-                                f"(AI: {abs(current_price-old_sl)/current_price*100:.2f}% > 3.0x ATR={atr_pct*3:.2f}%)",
-                                flush=True
-                            )
+                            print(f"[{symbol}] SL SANITY CAP: AI hallucinated SL > 10%. Corrected {old_sl} → {sl_price}", flush=True)
 
-                        # --- SL FLOOR (too tight — gets stopped by noise) ---
-                        if risk_dist < atr_sl_min:
+                        # --- SL FLOOR (Absurdly tight) ---
+                        if risk_dist < min_allowed_risk:
                             old_sl = sl_price
                             sl_price = round(
-                                current_price - atr_sl_min if signal_dir == "LONG" else current_price + atr_sl_min,
+                                current_price - min_allowed_risk if signal_dir == "LONG" else current_price + min_allowed_risk,
                                 price_precision
                             )
                             risk_dist = abs(current_price - sl_price)
-                            print(
-                                f"[{symbol}] SL FLOOR (ATR): {old_sl} → {sl_price} "
-                                f"(AI: {abs(current_price-old_sl)/current_price*100:.2f}% < 1.5x ATR={atr_pct*1.5:.2f}%)",
-                                flush=True
-                            )
+                            print(f"[{symbol}] SL SANITY FLOOR: AI hallucinated SL < 0.1%. Corrected {old_sl} → {sl_price}", flush=True)
 
                         # --- TP FLOOR (ensures minimum R:R = 1.5) ---
+                        # --- TP FLOOR (Basic Sanity Check: R:R >= 0.5) ---
                         reward_dist = abs(tp_price - current_price)
-                        if reward_dist < atr_tp_min:
+                        if reward_dist < (risk_dist * 0.5):
                             old_tp = tp_price
                             tp_price = round(
-                                current_price + atr_tp_min if signal_dir == "LONG" else current_price - atr_tp_min,
+                                current_price + (risk_dist * 0.5) if signal_dir == "LONG" else current_price - (risk_dist * 0.5),
                                 price_precision
                             )
                             reward_dist = abs(tp_price - current_price)
                             rr_actual = reward_dist / risk_dist if risk_dist > 0 else 0
                             print(
-                                f"[{symbol}] TP FLOOR (ATR): {old_tp} → {tp_price} "
-                                f"(min 2.25x ATR={atr_pct*2.25:.2f}%, R:R={rr_actual:.2f})",
+                                f"[{symbol}] TP SANITY FLOOR: {old_tp} → {tp_price} "
+                                f"(Forced min R:R=0.5, actual={rr_actual:.2f})",
                                 flush=True
                             )
                         else:
