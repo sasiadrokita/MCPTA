@@ -1,4 +1,4 @@
 # Centrally managed version file for Antigravity
-VERSION = "23.8.0"
-CODENAME = "ATR Discipline"
+VERSION = "24.0.0"
+CODENAME = "Orderflow Trailing"
 FULL_VERSION = f"v{VERSION} ({CODENAME})"

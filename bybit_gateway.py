@@ -274,3 +274,56 @@ class BybitGateway:
         except Exception as e:
             print(f"[BYBIT] PnL fetch error: {e}")
             return []
+
+    def get_orderflow_metrics(self, symbol):
+        """
+        V24.0: Retrieves Funding Rate and approximate CVD (last 500 trades) for AI Context.
+        """
+        try:
+            raw_sym = symbol.replace('/', '').split(':')[0]
+            linear_sym = f"{raw_sym}/USDT:USDT" if '/' not in symbol else symbol
+            
+            funding_rate = 0.0
+            try:
+                fr_data = self.exchange.fetch_funding_rate(linear_sym)
+                funding_rate = float(fr_data.get('fundingRate', 0.0))
+            except Exception as e:
+                print(f"[BYBIT] Funding Rate fetch error for {symbol}: {e}")
+
+            cvd = 0.0
+            try:
+                trades = self.exchange.fetch_trades(linear_sym, limit=500)
+                if trades:
+                    buy_vol = sum(t.get('amount', 0) for t in trades if t.get('side') == 'buy')
+                    sell_vol = sum(t.get('amount', 0) for t in trades if t.get('side') == 'sell')
+                    cvd = buy_vol - sell_vol
+            except Exception as e:
+                print(f"[BYBIT] CVD fetch error for {symbol}: {e}")
+
+            return {
+                "funding_rate": funding_rate,
+                "cvd": cvd
+            }
+        except Exception as e:
+            print(f"[BYBIT] Orderflow metrics error: {e}")
+            return {"funding_rate": 0.0, "cvd": 0.0}
+
+    def set_trailing_stop(self, symbol, trailing_dist, active_price=None):
+        """
+        V24.0: Sets a Trailing Stop for an open position using Bybit V5 API.
+        """
+        try:
+            raw_sym = symbol.replace('/', '').split(':')[0]
+            params = {
+                'category': 'linear',
+                'symbol': raw_sym,
+                'trailingStop': str(trailing_dist)
+            }
+            if active_price:
+                params['activePrice'] = str(active_price)
+                
+            res = self.exchange.privatePostV5PositionTradingStop(params)
+            return res
+        except Exception as e:
+            print(f"[BYBIT] Trailing Stop error for {symbol}: {e}")
+            return None

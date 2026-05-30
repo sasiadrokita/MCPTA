@@ -1165,10 +1165,11 @@ def update_trailing_stop(symbol, current_price, params, atr):
         pos_list = bybit.get_positions()
         pos = next((p for p in pos_list if p.get('symbol_raw', p['symbol']) == symbol), None)
         if not pos or float(pos.get('contracts', pos.get('qty', 0))) == 0:
-            print(f"[{symbol}] ⚠️ PHANTOM DETECTED: Position closed on Bybit. Cleaning up...")
+            print(f"[{symbol}] POSITION CLOSED natively on Bybit (SL/TP hit). Cleaning up and fetching PnL...")
             trade["active"] = False
             cancel_all_orders(symbol)
-            send_telegram_message(f"🧹 *[{symbol}] PHANTOM CLEANUP*\nPosition was closed externally on Bybit.")
+            # V24.0: Since Bybit natively handles SL/Trailing Stop, we trigger the PnL report immediately.
+            threading.Thread(target=report_closed_position, args=(symbol, trade['side']), daemon=True).start()
             return
         
     price_precision = get_price_precision(symbol)
@@ -1223,43 +1224,9 @@ def update_trailing_stop(symbol, current_price, params, atr):
                 trade["is_expanding"] = True
                 threading.Thread(target=expand_tp_targets, args=(symbol, current_price), daemon=True).start()
 
-        # Final SL value determination
-        if trade["tp1_hit"]:
-            ideal_sl = max(ideal_sl, trade["current_sl"]) # Strict Ladder
-              
-        safe_sl = round(current_price * 0.9995, price_precision)
-        needs_update = False
-        final_sl = ideal_sl
-        
-        if not trade["algo_id"]:
-            if current_price <= ideal_sl:
-                 trade["active"] = False
-                 exit_side = 'SELL' if trade['side'] == 'BUY' else 'BUY'
-                 cancel_all_orders(symbol)
-                 place_market_order(symbol, exit_side, trade['qty'], reduce_only=True)
-                 print(f"[{symbol}] EMERGENCY SL HIT (no algo_id). Closed via market order.", flush=True)
-                 return
-            final_sl = min(ideal_sl, safe_sl)
-            needs_update = True
-        else:
-            theoretical_sl = max(ideal_sl, trade["current_sl"])
-            # SAFETY: NEVER downgrade the SL in a BUY trade
-            theoretical_sl = max(theoretical_sl, old_sl)
-            
-            nowy_sl = min(theoretical_sl, safe_sl)
-            if force_update or (nowy_sl > (old_sl + 1e-9) and (nowy_sl - old_sl) / (old_sl if old_sl > 0 else 1) > 0.0005):
-                final_sl = nowy_sl
-                needs_update = True
-
-        if needs_update:
-            cancel_all_orders(symbol) # Clear old SL/TP
-            sl_side = 'sell' if trade['side'] == 'BUY' else 'buy'
-            res = bybit.create_order(symbol, 'stop_market', sl_side, trade['qty'], final_sl, 
-                                   params={'stopPrice': final_sl, 'triggerBy': 'MarkPrice', 'reduceOnly': True})
-            if res and 'id' in res:
-                trade["current_sl"] = final_sl
-                trade["algo_id"] = res['id']
-                trade["stop_order_id"] = res['id']
+    # V24.0: Manual SL trailing removed.
+    # Native Bybit Trailing Stop is activated on order entry and handles SL natively.
+    pass
 
 _report_lock = threading.Lock()
 
@@ -1528,7 +1495,7 @@ def get_dynamic_leverage(symbol, nexus_score, fgi_score, adx, suggested_leverage
     if adx < 20: # RANGING/CHOP
         regime_cap = 5 # Strict cap for ranging markets
     
-    final_leverage = int(suggested_leverage * nexus_multiplier * fgi_multiplier)
+    final_leverage = int(round(suggested_leverage * nexus_multiplier * fgi_multiplier))
     final_leverage = max(1, min(final_leverage, regime_cap))
     
     print(f"[{symbol}] DYNAMIC LEVERAGE: Suggested {suggested_leverage}x -> Final {final_leverage}x (Nexus: {nexus_score}, FGI: {fgi_score}, ADX: {adx:.1f})")
@@ -1831,6 +1798,11 @@ def evaluate_market_condition(symbol, current_price):
 
         # Order Book Impact Analysis
         order_book_impact = get_order_book_imbalance(symbol, current_price, threshold_pct=0.01)
+        
+        # Orderflow Metrics (V24.0: Funding Rate & CVD)
+        orderflow = bybit.get_orderflow_metrics(symbol)
+        funding_rate = orderflow['funding_rate']
+        cvd = orderflow['cvd']
 
         # Trade History Context for AI
         symbol_history = []
@@ -1932,6 +1904,7 @@ You have access to the following intelligence sources — use ALL of them:
   5. BTC/ETH SYMMETRY: cross-asset confirmation — divergence is a warning sign
   6. NEXUS AI SCORE: macro sentiment from news, video analysis, Fear&Greed
   7. CONDITIONAL LESSONS: your own learned patterns from closed trades
+  8. ORDERFLOW (CVD/Funding): pure buying/selling pressure metrics
 
 ═══════════════════════════════════════════════════════
 PORTFOLIO STATE:
@@ -1952,6 +1925,7 @@ QUANTITATIVE METRICS:
 - SFP Signal: {sfp_signal if sfp_signal else 'None'} {"← HIGH CONVICTION reversal signal" if sfp_signal else ""}
 - BTC/ETH Sync: {symmetry_desc}
 - Order Book Imbalance: {order_book_impact}
+- Orderflow Data: CVD (last 500 trades) = {cvd:.2f} ({"Bullish" if cvd > 0 else "Bearish"}), Funding Rate = {funding_rate:.6f}
 
 TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
 
@@ -1990,7 +1964,7 @@ RISK MANAGEMENT — HARD RULES:
 - Recommended SL placement: behind the most recent swing low/high or SFP wick, typically 1.5–2.5x ATR from entry.
 - Recommended TP placement: at the next structural resistance/support, typically 2.0–4.0x ATR from entry.
 - `scale`: 0.3-0.5 for uncertain setups, 0.7-1.0 for high confluence.
-- Leverage: 2-3x default, 5x MAXIMUM only for SFP-confirmed high-conviction setups.
+- Leverage: 3-5x default, 7x MAXIMUM only for SFP-confirmed high-conviction setups. (Note: System will dynamically scale this down based on risk factors).
 - HOLD is a valid and often optimal action — do NOT force trades in ambiguous conditions.
 
 Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": float, "scale": 0.1-1.0, "leverage": int, "wave_analysis": "short_desc", "reason": "string"}}
@@ -2072,8 +2046,19 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                      print(f"[{symbol}] EXIT BLOCKED: AI attempted to cut winners early ({pnl_pct:.2f}%). Forcing HOLD.", flush=True)
                      return
                 trade_age = time.time() - trade.get("entry_time", time.time())
-                if not is_test_mission and trade_age < 1800:
-                    print(f"[{symbol}] EARLY EXIT BLOCKED: Position too young ({trade_age/60:.1f} min).", flush=True)
+                
+                # V24.0 Smart Early Exit bypass
+                is_deep_underwater = False
+                sl_prc = float(trade.get('current_sl', 0))
+                entry_prc = float(trade['entry_price'])
+                if sl_prc > 0 and entry_prc > 0:
+                    if trade['side'] == 'BUY' and current_price < entry_prc:
+                        is_deep_underwater = (entry_prc - current_price) / (entry_prc - sl_prc) > 0.5
+                    elif trade['side'] == 'SELL' and current_price > entry_prc:
+                        is_deep_underwater = (current_price - entry_prc) / (sl_prc - entry_prc) > 0.5
+                
+                if not is_test_mission and trade_age < 1800 and not is_deep_underwater:
+                    print(f"[{symbol}] EARLY EXIT BLOCKED: Position too young ({trade_age/60:.1f} min) and not deep underwater.", flush=True)
                     return
                 print(f"[{symbol}] AI DICTATOR ORDERS EARLY EXIT: {ai_reason}")
                 exit_side = 'SELL' if trade['side'] == 'BUY' else 'BUY'
@@ -2195,12 +2180,22 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
 
                     set_leverage(symbol, ai_leverage)
                     side = 'BUY' if signal_dir == 'LONG' else 'SELL'
-                    order_res = place_market_order(symbol, side, qty, sl=sl_price, tp=tp_price)
+                    
+                    # V24.0: Remove hard TP Limit order, prepare for Trailing Stop
+                    order_res = place_market_order(symbol, side, qty, sl=sl_price, tp=0)
                     print(f"[{symbol}] ORDER RESPONSE: {order_res}", flush=True)
                 
                 if order_res and (order_res.get('orderId') or order_res.get('id')):
                     final_order_id = order_res.get('orderId') or order_res.get('id')
-                    log_trade(signal_dir, symbol, qty, current_price, sl_price, tp_price, ai_leverage, ai_reason)
+                    
+                    # V24.0: Set Native Bybit Trailing Stop (Trailing distance = 1.5 ATR)
+                    trailing_distance = round(atr * 1.5, price_precision)
+                    # Activate it after 1x ATR profit to let it breathe initially
+                    active_prc = round(current_price + atr if side == 'BUY' else current_price - atr, price_precision)
+                    bybit.set_trailing_stop(symbol, trailing_dist=trailing_distance, active_price=active_prc)
+                    print(f"[{symbol}] V24.0 TRAILING STOP ACTIVATED: Dist={trailing_distance}, ActivePrice={active_prc}", flush=True)
+
+                    log_trade(signal_dir, symbol, qty, current_price, sl_price, 0, ai_leverage, ai_reason)
                     # [v23.4] fire_bridge is unnecessary for Bybit V5 (native TP/SL)
                     
                     if BOT_MEMORY_OK:
