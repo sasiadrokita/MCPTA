@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 import memory
 
 # Configuration
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
 api_key = os.environ.get("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key)
@@ -129,3 +132,91 @@ def trigger_lesson_extraction(trade_id: int):
     thread.daemon = True # Does not block bot shutdown
     thread.start()
     print(f"[LESSON EXTRACTOR] Learning thread started for Trade ID: {trade_id}", flush=True)
+
+def compress_lessons_daily(symbol: str) -> str:
+    """
+    V23.8: Compresses the accumulated AI lessons into a highly condensed set of rules.
+    Acts as a Reinforcement Learning agent: reviews recent trades, evaluates lessons,
+    keeps the ones that work, and discards contradictory or failing ones.
+    Returns a summary string for the daily report.
+    """
+    if not api_key:
+        return f"[{symbol}] Gemini API missing. Compression skipped."
+
+    try:
+        # Load learning data
+        learn_path = 'autonomic_learning.json'
+        if not os.path.exists(learn_path):
+            return f"[{symbol}] No learning file found."
+            
+        with open(learn_path, 'r') as f:
+            learn_data = json.load(f)
+            
+        key = f'ai_lessons_learned_{symbol}'
+        raw_lessons = learn_data.get(key, "")
+        
+        # Count lines roughly to see if compression is needed
+        lines_count = len(raw_lessons.split('\n'))
+        if lines_count < 20:
+            return f"[{symbol}] Only {lines_count} lessons. Compression not needed yet."
+
+        # Fetch recent performance to inform RL
+        import sqlite3
+        conn = sqlite3.connect('bot_memory.db')
+        cur = conn.cursor()
+        cur.execute("SELECT side, pnl, context, close_reason FROM trades WHERE symbol = ? ORDER BY id DESC LIMIT 20", (symbol,))
+        recent_trades = cur.fetchall()
+        conn.close()
+
+        wins = sum(1 for t in recent_trades if t[1] > 0)
+        losses = sum(1 for t in recent_trades if t[1] <= 0)
+        win_rate = round(wins / (wins + losses) * 100, 1) if recent_trades else 0
+        
+        perf_summary = f"Recent {symbol} Performance: {wins} Wins, {losses} Losses (Win Rate: {win_rate}%)\n"
+        
+        prompt = f"""
+You are the Reinforcement Learning Architect for Antigravity AI. 
+Your task is to review the accumulated raw trading lessons for {symbol} and compress them into a set of highly effective, non-contradictory "Golden Rules".
+
+*** RECENT PERFORMANCE ***
+{perf_summary}
+
+*** RAW LESSONS LOG ***
+{raw_lessons}
+
+*** TASK (REINFORCEMENT LEARNING) ***
+1. Identify the core patterns that actually lead to success (profits) or prevent failure (losses).
+2. Filter out contradictory rules, obsolete strategies, or noise.
+3. Consolidate repetitive lessons into single, powerful directives.
+4. Format the output as a list of MAX 20 "Golden Rules" (Bullet points).
+5. The final output must be extremely concise and direct (max 100 lines total).
+6. DO NOT use markdown code blocks like ```json or ```text. Just return the plain text list of rules.
+
+Example Format:
+- IF (Trend is DOWN AND Nexus Bias is BEARISH AND RSI < 40) THEN (Prioritize SHORT) BECAUSE (High probability of continuation).
+- STRICTLY AVOID longs during extreme volatility (ATR > X).
+"""
+
+        model = genai.GenerativeModel(MODEL_NAME)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(temperature=0.1)
+        )
+        
+        compressed_text = response.text.strip().replace("```text", "").replace("```", "").strip()
+        new_lines_count = len(compressed_text.split('\n'))
+        
+        # Overwrite with compressed lessons
+        learn_data[key] = compressed_text
+        with open(learn_path, 'w') as f:
+            json.dump(learn_data, f, indent=4)
+            
+        summary_msg = f"[{symbol}] Compressed {lines_count} lines of lessons into {new_lines_count} Golden Rules."
+        print(f"[LESSON COMPRESSION] {summary_msg}", flush=True)
+        return summary_msg
+
+    except Exception as e:
+        err_msg = f"[{symbol}] Compression error: {e}"
+        print(f"[LESSON COMPRESSION] {err_msg}", flush=True)
+        return err_msg
+

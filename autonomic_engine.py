@@ -919,9 +919,9 @@ def archive_to_black_box(title, report_content):
     except Exception as e:
         print(f"BLACK_BOX.md write error: {e}")
 
-def generate_master_daily_report():
+def generate_master_daily_report(compression_summary=""):
     """
-    V20.0: MASTER DAILY REPORT (High-Fidelity)
+    V23.8: MASTER DAILY REPORT (High-Fidelity) + RL Compression
     Merges market analysis and self-learning into a single, professional document 
     modeled after IT Tech's "On-chain Insights".
     """
@@ -1005,6 +1005,8 @@ Market Overview (Live):
 {'\n'.join(market_overview)}
 Recent Exchange Trades:
 {exchange_history}
+Compression Summary (Reinforcement Learning):
+{compression_summary if compression_summary else 'No compression today.'}
 
 --- TASK ---
 Wygeneruj raport w formacie JSON, zawierający:
@@ -1276,7 +1278,19 @@ def background_tasks():
                             GLOBAL_STATE['last_report_day'] = now_dt.tm_mday
                             learn_data['last_report_day'] = now_dt.tm_mday
                             save_learning_data(learn_data)
-                            generate_master_daily_report()
+                            
+                            # --- AI LESSON COMPRESSION (REINFORCEMENT LEARNING) ---
+                            compression_msgs = []
+                            if LESSON_EXTRACTOR_OK:
+                                print("[BACKGROUND] Starting AI Lesson Compression...", flush=True)
+                                for sym in SYMBOLS:
+                                    msg = ai_lesson_extractor.compress_lessons_daily(sym)
+                                    compression_msgs.append(msg)
+                            
+                            # Reload learning data after compression so report has fresh data
+                            learn_data = load_learning_data()
+                            
+                            generate_master_daily_report(compression_summary="\n".join(compression_msgs))
                             GLOBAL_STATE['last_report_hour'] = now_dt.tm_hour
                     finally:
                         _report_lock.release()
