@@ -626,21 +626,24 @@
             </div>
         </div>
 
-        <div class="card grid-wide">
-            <div class="card-header"><span class="card-icon">📋</span> Recent Trades</div>
+        <div class="card grid-full">
+            <div class="card-header"><span class="card-icon">📋</span> Recent Trades (Bybit)</div>
             <div style="overflow-x:auto;">
                 <table class="trades-table">
                     <thead>
                         <tr>
-                            <th>Time</th>
+                            <th>Date</th>
                             <th>Symbol</th>
                             <th>Side</th>
+                            <th>Entry</th>
+                            <th>Exit</th>
+                            <th>Lev</th>
                             <th>PnL (USDT)</th>
                         </tr>
                     </thead>
                     <tbody id="trades-body">
                         <tr>
-                            <td colspan="4" style="color:var(--text-muted); text-align:center; padding:1.5rem;">
+                            <td colspan="7" style="color:var(--text-muted); text-align:center; padding:1.5rem;">
                                 Loading history...</td>
                         </tr>
                     </tbody>
@@ -648,7 +651,7 @@
             </div>
         </div>
 
-        <div class="card grid-wide">
+        <div class="card grid-full">
             <div class="card-header"><span class="card-icon">📟</span> Live Log (engine.log)</div>
             <div class="log-box" id="log-box">Loading logs...</div>
         </div>
@@ -794,17 +797,21 @@
                 const trades = data.recent_trades || [];
                 const tbody = document.getElementById('trades-body');
                 if (trades.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted); text-align:center; padding:1.5rem;">No trade history available.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted); text-align:center; padding:1.5rem;">No trade history available.</td></tr>';
                 } else {
                     tbody.innerHTML = trades.map(t => {
                         const pnl = t.pnl;
                         const pnlText = (pnl !== null) ? `${pnl >= 0 ? '+' : ''}${parseFloat(pnl).toFixed(2)}` : '--';
                         const pnlClass = (pnl !== null) ? (pnl >= 0 ? 'pnl-pos' : 'pnl-neg') : '';
+                        const sideClass = t.side === 'LONG' ? 'pnl-pos' : 'pnl-neg';
                         return `<tr>
           <td>${t.time}</td>
           <td>${t.symbol}</td>
-          <td>${t.side}</td>
-          <td class="${pnlClass}">${pnlText}</td>
+          <td class="${sideClass}" style="font-weight:600">${t.side}</td>
+          <td>${t.entry || '--'}</td>
+          <td>${t.exit || '--'}</td>
+          <td>${t.leverage ? t.leverage + 'x' : '--'}</td>
+          <td class="${pnlClass}" style="font-weight:600">${pnlText}</td>
         </tr>`;
                     }).join('');
                 }

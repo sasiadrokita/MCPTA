@@ -136,23 +136,30 @@ def get_raw_intel():
     return intel_data
 
 def get_recent_trades(n=15):
-    """v24.2: Fetches recent closed trades directly from Bybit exchange."""
+    """v23.8: Fetches recent closed trades from Bybit V5 with full date+time."""
     try:
-        # Fetch closed PnL from Bybit V5
         res = bybit.exchange.private_get_v5_position_closed_pnl({'category': 'linear', 'limit': n})
         if res.get('retCode') == '0':
             trades_list = res.get('result', {}).get('list', [])
             trades = []
             for t in trades_list:
-                # Timestamp conversion
                 ts = int(t.get('updatedTime', 0)) / 1000
-                time_str = time.strftime('%H:%M:%S', time.localtime(ts))
+                date_str = time.strftime('%Y-%m-%d %H:%M', time.localtime(ts))
+                
+                # Bybit 'side' in closed_pnl is the CLOSING side.
+                # If closing side is Buy, position was SHORT. If Sell, position was LONG.
+                closing_side = t.get('side', '').capitalize()
+                position_side = 'LONG' if closing_side == 'Sell' else 'SHORT'
                 
                 trades.append({
-                    'time': time_str,
-                    'symbol': t.get('symbol'),
+                    'time': date_str,
+                    'symbol': t.get('symbol', ''),
                     'pnl': float(t.get('closedPnl', 0)),
-                    'side': f"CLOSED {t.get('side', '').upper()}"
+                    'side': position_side,
+                    'entry': t.get('avgEntryPrice', ''),
+                    'exit': t.get('avgExitPrice', ''),
+                    'leverage': t.get('leverage', ''),
+                    'qty': t.get('qty', '')
                 })
             return trades
         return []
