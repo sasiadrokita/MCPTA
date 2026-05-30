@@ -25,6 +25,18 @@ This project was built to demonstrate advanced system architecture, asynchronous
 
 ## 🗓️ Changelog
 
+### v24.1.0 — *Visual Intelligence* (2026-05-30)
+> Complete overhaul of the frontend dashboard and charting logic.
+
+**Visual Dashboard:**
+- **Dynamic TradingView Charts** — Replaced raw data streams with fully interactive, dynamic Lightweight Charts visualization.
+- **Historical Orderflow Sync** — Fetching exact trade execution logs (fills) directly from Bybit API for ultra-precise entry/exit marker placement.
+- **Multi-timeframe capabilities** — New timeframe selector directly within the UI (1W, 1D, 4H, 1H, 15m).
+- **EMA Visualization** — Automatically calculates and plots EMA50 relative to the selected timeframe.
+- **Fail-safe Frontend** — Dashboard gracefully falls back if CDN or specific API routes timeout, isolating charting errors from the core engine status display.
+
+---
+
 ### v23.0.0 — *Adaptive Intelligence* (2026-05-22)
 > Major architectural overhaul — the bot now adapts to market conditions dynamically and learns from its own mistakes in a context-aware manner.
 
