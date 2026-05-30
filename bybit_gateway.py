@@ -120,6 +120,9 @@ class BybitGateway:
                     sl_val = float(raw.get('stopLoss', 0) or 0)
                     tp_val = float(raw.get('takeProfit', 0) or 0)
                     
+                    # createdTime is in ms, default to current time if missing
+                    created_time_ms = float(raw.get('createdTime', p.get('timestamp') or (time.time() * 1000)))
+                    
                     # symbol_raw = Bybit format (ETHUSDT) for engine
                     raw_sym = raw.get('symbol', p['symbol'].replace('/', '').split(':')[0])
                     active.append({
@@ -134,7 +137,8 @@ class BybitGateway:
                         'leverage': float(p.get('leverage', 1) or 1),
                         'liquidation_price': float(p.get('liquidationPrice', 0) or 0),
                         'sl': sl_val,
-                        'tps': [tp_val] if tp_val > 0 else []
+                        'tps': [tp_val] if tp_val > 0 else [],
+                        'entry_time': created_time_ms / 1000.0  # Convert to seconds
                     })
             return active
         except Exception as e:

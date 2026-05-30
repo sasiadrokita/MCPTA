@@ -282,6 +282,7 @@ def binance_request(endpoint, query_string="", method='GET', silent=False):
             for p in pos_list:
                 if float(p.get('contracts', 0)) > 0:
                     side_mult = 1 if p.get('side') == 'long' else -1
+                    created_time_ms = float(p.get('info', {}).get('createdTime', p.get('timestamp') or (time.time() * 1000)))
                     res.append({
                         "symbol": p.get('symbol'),
                         "positionAmt": str(float(p.get('contracts', 0)) * side_mult),
@@ -289,7 +290,8 @@ def binance_request(endpoint, query_string="", method='GET', silent=False):
                         "markPrice": str(p.get('markPrice', 0)),
                         "unRealizedProfit": str(p.get('unrealizedPnl', 0)),
                         "leverage": str(p.get('leverage', 1)),
-                        "liquidationPrice": str(p.get('liquidationPrice', 0))
+                        "liquidationPrice": str(p.get('liquidationPrice', 0)),
+                        "updateTime": int(created_time_ms)
                     })
             return res
             
@@ -2380,6 +2382,8 @@ def main():
                     elif tp1_hit_recovered:
                         recovered_sl = round(entry * (1.001 if side == 'BUY' else 0.999), get_price_precision(symbol))
                     
+                    recovered_entry_time = pos.get('updateTime', int(time.time() * 1000)) / 1000.0
+
                     GLOBAL_STATE['open_trades'][symbol] = {
                         "entry_price": entry,
                         "best_price": best_p,
@@ -2389,6 +2393,7 @@ def main():
                         "qty": abs(qty),
                         "qty_at_start": abs(qty), # Recovery assumes current qty is start if we just loaded
                         "active": True,
+                        "entry_time": recovered_entry_time,
                         "tp_1": tp1_recovered,
                         "tp_2": tp2_recovered,
                         "tp_3": None,
