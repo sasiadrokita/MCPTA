@@ -2190,10 +2190,10 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                     
                     # V24.0: Set Native Bybit Trailing Stop (Trailing distance = 1.5 ATR)
                     trailing_distance = round(atr * 1.5, price_precision)
-                    # Activate it after 1x ATR profit to let it breathe initially
-                    active_prc = round(current_price + atr if side == 'BUY' else current_price - atr, price_precision)
+                    # Activate it ONLY after hitting the AI's designated Take Profit level
+                    active_prc = tp_price
                     bybit.set_trailing_stop(symbol, trailing_dist=trailing_distance, active_price=active_prc)
-                    print(f"[{symbol}] V24.0 TRAILING STOP ACTIVATED: Dist={trailing_distance}, ActivePrice={active_prc}", flush=True)
+                    print(f"[{symbol}] V24.0 TRAILING STOP PREPARED: Dist={trailing_distance}, Activates at TP={active_prc}", flush=True)
 
                     log_trade(signal_dir, symbol, qty, current_price, sl_price, 0, ai_leverage, ai_reason)
                     # [v23.4] fire_bridge is unnecessary for Bybit V5 (native TP/SL)

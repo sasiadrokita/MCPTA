@@ -273,6 +273,125 @@ def api_bot_action():
 
 # ─── Entrypoint ───────────────────────────────────────────────────────────────
 
+# --- CHARTING MODULE (V24.0) ---
+def calculate_ema_local(prices, period):
+    if len(prices) < period:
+        return [0] * len(prices)
+    ema = [sum(prices[:period]) / period]
+    multiplier = 2 / (period + 1)
+    for price in prices[period:]:
+        ema.append((price - ema[-1]) * multiplier + ema[-1])
+    # Pad the beginning with None to match length
+    return [None]*(period-1) + ema
+
+@app.route('/api/chart_data')
+def api_chart_data():
+    symbol = request.args.get('symbol', 'BTCUSDT')
+    timeframe = request.args.get('timeframe', '15m')
+    # Convert generic symbol to CCXT Bybit Linear format
+    base_sym = symbol.replace('/', '').replace(':USDT', '').replace('USDT', '')
+    ccxt_symbol = f"{base_sym}/USDT:USDT"
+    
+    try:
+        # Fetch klines
+        klines = bybit.exchange.fetch_ohlcv(ccxt_symbol, timeframe, limit=500)
+        
+        formatted_candles = []
+        prices = []
+        for k in klines:
+            # k: [timestamp, open, high, low, close, volume]
+            formatted_candles.append({
+                'time': int(k[0] / 1000), # UNIX timestamp in seconds for TV
+                'open': float(k[1]),
+                'high': float(k[2]),
+                'low': float(k[3]),
+                'close': float(k[4])
+            })
+            prices.append(float(k[4]))
+        
+        # Calculate EMA 50 (same as Bot uses for 15m trend filter)
+        emas = calculate_ema_local(prices, 50)
+        ema_data = []
+        for i, val in enumerate(emas):
+            if val is not None:
+                ema_data.append({
+                    'time': formatted_candles[i]['time'],
+                    'value': round(val, 2)
+                })
+
+        return jsonify({
+            'candles': formatted_candles,
+            'ema_50': ema_data
+        })
+    except Exception as e:
+        print(f"[DASH] Chart Data Error: {e}")
+        return jsonify({'candles': [], 'ema_50': [], 'error': str(e)})
+
+@app.route('/api/chart_markers')
+def api_chart_markers():
+    symbol = request.args.get('symbol', 'BTCUSDT')
+    markers = []
+    
+    try:
+        # 1. Historical Executions (Entries and Exits)
+        base_sym = symbol.replace('/', '').replace(':USDT', '').replace('USDT', '')
+        ccxt_symbol = f"{base_sym}/USDT:USDT"
+        
+        try:
+            my_trades = bybit.exchange.fetch_my_trades(symbol=ccxt_symbol, limit=100)
+            for t in my_trades:
+                ts = int(t['timestamp'] / 1000)
+                side = t['side'].upper() # 'BUY' or 'SELL'
+                raw = t.get('info', {})
+                closed_size = float(raw.get('closedSize', 0) or 0)
+                price = float(t['price'])
+                
+                # Determine if it was an Entry or Exit
+                if closed_size > 0:
+                    # It's an exit. If we bought to close, we were SHORT. If we sold to close, we were LONG.
+                    pos_side = "SHORT" if side == "BUY" else "LONG"
+                    markers.append({
+                        'time': ts,
+                        'position': 'aboveBar',
+                        'color': '#8b5cf6', # purple for exits
+                        'shape': 'circle',
+                        'text': f"Exit {pos_side} ({price})"
+                    })
+                else:
+                    # It's an entry. Buy means LONG, Sell means SHORT.
+                    pos_side = "LONG" if side == "BUY" else "SHORT"
+                    markers.append({
+                        'time': ts,
+                        'position': 'belowBar' if pos_side == 'LONG' else 'aboveBar',
+                        'color': '#10b981' if pos_side == 'LONG' else '#ef4444',
+                        'shape': 'arrowUp' if pos_side == 'LONG' else 'arrowDown'
+                    })
+        except Exception as e:
+            print(f"[DASH] fetch_my_trades error: {e}")
+
+        # 2. Active Positions (Current)
+        positions = get_positions()
+        for p in positions:
+            if p['symbol_raw'] == symbol or p['symbol'] == symbol or p['symbol'].startswith(symbol.replace('USDT','')):
+                # CCXT unified or Bybit raw returns createdTime in ms or entry time
+                # However `get_positions()` mapped `entry_time` if available, wait, `get_positions` uses `created_time_ms`
+                # Let's just put it at the end (current time) if we don't have exact timestamp, or fetch from dict
+                ts = int(p.get('entry_time', time.time()))
+                side_str = p['side'].upper()
+                markers.append({
+                    'time': ts,
+                    'position': 'belowBar' if side_str == 'LONG' else 'aboveBar',
+                    'color': '#10b981' if side_str == 'LONG' else '#ef4444',
+                    'shape': 'arrowUp' if side_str == 'LONG' else 'arrowDown'
+                })
+                
+        # Sort markers by time
+        markers.sort(key=lambda x: x['time'])
+        return jsonify(markers)
+    except Exception as e:
+        print(f"[DASH] Marker Error: {e}")
+        return jsonify([])
+
 if __name__ == '__main__':
     port = int(os.environ.get('DASHBOARD_PORT', 5000))
     print(f"\n{'─'*55}")

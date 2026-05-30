@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🛸 Antigravity Dashboard <span class="version-tag"></span></title>
+    <!-- TradingView Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
@@ -612,6 +614,29 @@
             </div>
         </div>
 
+        <!-- CHART MODULE -->
+        <div class="card grid-full" style="height: 500px; display: flex; flex-direction: column;">
+            <div class="card-header" style="justify-content: space-between; display: flex; width: 100%;">
+                <div><span class="card-icon">📈</span> Live Trading Chart & EMA 50</div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <select id="chart-timeframe-select" class="btn" style="background: var(--surface2); color: var(--text);" onchange="updateChartSymbol()">
+                        <option value="15m">15m</option>
+                        <option value="1h">1H</option>
+                        <option value="4h">4H</option>
+                        <option value="1d">1D</option>
+                        <option value="1w">1W</option>
+                    </select>
+                    <select id="chart-symbol-select" class="btn" style="background: var(--surface2); color: var(--text);" onchange="updateChartSymbol()">
+                        <option value="BTCUSDT">BTCUSDT</option>
+                        <option value="ETHUSDT">ETHUSDT</option>
+                        <option value="SOLUSDT">SOLUSDT</option>
+                        <option value="LINKUSDT">LINKUSDT</option>
+                    </select>
+                </div>
+            </div>
+            <div id="tvchart" style="flex: 1; position: relative; width: 100%;"></div>
+        </div>
+
         <div class="card grid-full">
             <div class="card-header"><span class="card-icon">🧠</span> Raw Intel Feed (Nexus Transparency)</div>
             <div id="intel-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
@@ -937,9 +962,121 @@
                 console.error('Fetch error:', err);
             });
         }
+        // --- CHART MODULE JS ---
+        let chart = null;
+        let candleSeries = null;
+        let emaSeries = null;
+        let currentChartSymbol = 'BTCUSDT';
+        let currentChartTimeframe = '15m';
 
-        fetchAll();
-        setInterval(fetchAll, 5000);
+        function initChart() {
+            const chartContainer = document.getElementById('tvchart');
+            if (!chartContainer) return;
+            
+            // Flex containers might have 0 height on first tick
+            const w = chartContainer.clientWidth || 800;
+            const h = chartContainer.clientHeight || 400;
+            
+            chart = LightweightCharts.createChart(chartContainer, {
+                width: w,
+                height: h,
+                layout: {
+                    background: { type: 'solid', color: 'transparent' },
+                    textColor: '#d1d4dc',
+                },
+                grid: {
+                    vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
+                    horzLines: { color: 'rgba(42, 46, 57, 0.5)' },
+                },
+                timeScale: {
+                    timeVisible: true,
+                    secondsVisible: false,
+                    borderColor: 'rgba(197, 203, 206, 0.8)',
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                },
+                rightPriceScale: {
+                    borderColor: 'rgba(197, 203, 206, 0.8)',
+                },
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#10b981',
+                downColor: '#ef4444',
+                borderDownColor: '#ef4444',
+                borderUpColor: '#10b981',
+                wickDownColor: '#ef4444',
+                wickUpColor: '#10b981',
+            });
+
+            emaSeries = chart.addLineSeries({
+                color: '#4f8ef7',
+                lineWidth: 2,
+                title: 'EMA 50',
+            });
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                chart.resize(chartContainer.clientWidth, chartContainer.clientHeight);
+            });
+            
+            fetchChartData();
+        }
+
+        function updateChartSymbol() {
+            currentChartSymbol = document.getElementById('chart-symbol-select').value;
+            currentChartTimeframe = document.getElementById('chart-timeframe-select').value;
+            fetchChartData();
+        }
+
+        function fetchChartData() {
+            if(!chart) return;
+            fetch(`/api/chart_data?symbol=${currentChartSymbol}&timeframe=${currentChartTimeframe}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.candles && data.candles.length > 0) {
+                        candleSeries.setData(data.candles);
+                        if (data.ema_50 && data.ema_50.length > 0) {
+                            emaSeries.setData(data.ema_50);
+                        }
+                        fetchChartMarkers();
+                    }
+                })
+                .catch(err => console.error("Chart fetch error:", err));
+        }
+
+        function fetchChartMarkers() {
+            fetch(`/api/chart_markers?symbol=${currentChartSymbol}&timeframe=${currentChartTimeframe}`)
+                .then(r => r.json())
+                .then(markers => {
+                    if (markers && Array.isArray(markers)) {
+                        candleSeries.setMarkers(markers);
+                    }
+                })
+                .catch(err => console.error("Marker fetch error:", err));
+        }
+
+        try {
+            document.getElementById('engine-status').innerHTML = '<div style="color:yellow;font-size:0.8rem">Initializing JS...</div>';
+            
+            fetchAll();
+            setInterval(fetchAll, 5000);
+            
+            document.getElementById('engine-status').innerHTML = '<div style="color:yellow;font-size:0.8rem">JS Init OK.</div>';
+        } catch (e) {
+            document.getElementById('engine-status').innerHTML = '<div style="color:red;font-size:0.7rem">' + e.toString() + '</div>';
+            console.error("Error in fetchAll init:", e);
+        }
+        
+        try {
+            initChart();
+            setInterval(fetchChartData, 60000);
+        } catch (e) {
+            console.error("Error in chart init:", e);
+            const tc = document.getElementById('tvchart');
+            if(tc) tc.innerHTML = '<div style="color:red; padding:20px;">Chart failed to load: ' + e.toString() + '</div>';
+        }
     </script>
 
 </body>
