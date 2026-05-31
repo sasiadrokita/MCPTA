@@ -135,6 +135,114 @@ def get_raw_intel():
 
     return intel_data
 
+# === HELPER FUNCTIONS FOR INDICATORS ===
+def calculate_rsi_array(prices, period=14):
+    if len(prices) < period + 1:
+        return [None] * len(prices)
+    
+    rsi_list = [None] * period
+    gains = []
+    losses = []
+    
+    for i in range(1, period + 1):
+        change = prices[i] - prices[i-1]
+        gains.append(max(0, change))
+        losses.append(max(0, -change))
+        
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
+    
+    if avg_loss == 0:
+        rsi_list.append(100.0)
+    else:
+        rs = avg_gain / avg_loss
+        rsi_list.append(100.0 - (100.0 / (1.0 + rs)))
+        
+    for i in range(period + 1, len(prices)):
+        change = prices[i] - prices[i-1]
+        gain = max(0, change)
+        loss = max(0, -change)
+        
+        avg_gain = (avg_gain * (period - 1) + gain) / period
+        avg_loss = (avg_loss * (period - 1) + loss) / period
+        
+        if avg_loss == 0:
+            rsi_list.append(100.0)
+        else:
+            rs = avg_gain / avg_loss
+            rsi_list.append(100.0 - (100.0 / (1.0 + rs)))
+            
+    return rsi_list
+
+def calculate_adx_array(klines, period=14):
+    if len(klines) < period * 2:
+        return [None] * len(klines)
+        
+    trs = []
+    pos_dms = []
+    neg_dms = []
+    
+    for i in range(1, len(klines)):
+        high = float(klines[i][2])
+        low = float(klines[i][3])
+        prev_high = float(klines[i-1][2])
+        prev_low = float(klines[i-1][3])
+        prev_close = float(klines[i-1][4])
+        
+        trs.append(max(high - low, abs(high - prev_close), abs(low - prev_close)))
+        
+        up_move = high - prev_high
+        down_move = prev_low - low
+        
+        if up_move > down_move and up_move > 0:
+            pos_dms.append(up_move)
+        else:
+            pos_dms.append(0)
+            
+        if down_move > up_move and down_move > 0:
+            neg_dms.append(down_move)
+        else:
+            neg_dms.append(0)
+            
+    smooth_tr = sum(trs[:period])
+    smooth_pos_dm = sum(pos_dms[:period])
+    smooth_neg_dm = sum(neg_dms[:period])
+    
+    dx_vals = []
+    for i in range(period, len(trs)):
+        smooth_tr = smooth_tr - (smooth_tr / period) + trs[i]
+        smooth_pos_dm = smooth_pos_dm - (smooth_pos_dm / period) + pos_dms[i]
+        smooth_neg_dm = smooth_neg_dm - (smooth_neg_dm / period) + neg_dms[i]
+        
+        if smooth_tr == 0:
+            dx = 0
+        else:
+            pos_di = 100 * (smooth_pos_dm / smooth_tr)
+            neg_di = 100 * (smooth_neg_dm / smooth_tr)
+            if pos_di + neg_di == 0:
+                dx = 0
+            else:
+                dx = 100 * abs(pos_di - neg_di) / (pos_di + neg_di)
+        dx_vals.append(dx)
+        
+    if not dx_vals:
+        return [None] * len(klines)
+        
+    adx_list = [None] * (period * 2 - 1)
+    adx = sum(dx_vals[:period]) / period if len(dx_vals) >= period else sum(dx_vals) / len(dx_vals)
+    adx_list.append(adx)
+    for i in range(period, len(dx_vals)):
+        adx = ((adx * (period - 1)) + dx_vals[i]) / period
+        adx_list.append(adx)
+        
+    # Align to klines length
+    diff = len(klines) - len(adx_list)
+    if diff > 0:
+        adx_list = [None]*diff + adx_list
+    elif diff < 0:
+        adx_list = adx_list[-len(klines):]
+    return adx_list
+
 def get_recent_trades(n=15):
     """v23.8: Fetches recent closed trades from Bybit V5 with full date+time."""
     try:
@@ -296,33 +404,37 @@ def api_chart_data():
         # Fetch klines
         klines = bybit.exchange.fetch_ohlcv(ccxt_symbol, timeframe, limit=500)
         
-        formatted_candles = []
-        prices = []
-        for k in klines:
-            # k: [timestamp, open, high, low, close, volume]
-            formatted_candles.append({
-                'time': int(k[0] / 1000), # UNIX timestamp in seconds for TV
+        # 3. Calculate indicators
+        closes = [float(k[4]) for k in klines]
+        ema_array = calculate_ema_local(closes, 50)
+        rsi_array = calculate_rsi_array(closes, period=14)
+        adx_array = calculate_adx_array(klines, period=14)
+        
+        # 4. Format for Lightweight Charts
+        chart_data = []
+        for i, k in enumerate(klines):
+            ts = int(k[0] / 1000)
+            ema_val = ema_array[i]
+            rsi_val = rsi_array[i]
+            adx_val = adx_array[i]
+            
+            data_point = {
+                'time': ts,
                 'open': float(k[1]),
                 'high': float(k[2]),
                 'low': float(k[3]),
                 'close': float(k[4])
-            })
-            prices.append(float(k[4]))
-        
-        # Calculate EMA 50 (same as Bot uses for 15m trend filter)
-        emas = calculate_ema_local(prices, 50)
-        ema_data = []
-        for i, val in enumerate(emas):
-            if val is not None:
-                ema_data.append({
-                    'time': formatted_candles[i]['time'],
-                    'value': round(val, 2)
-                })
+            }
+            if ema_val is not None:
+                data_point['ema50'] = round(ema_val, 2)
+            if rsi_val is not None:
+                data_point['rsi'] = round(rsi_val, 2)
+            if adx_val is not None:
+                data_point['adx'] = round(adx_val, 2)
+                
+            chart_data.append(data_point)
 
-        return jsonify({
-            'candles': formatted_candles,
-            'ema_50': ema_data
-        })
+        return jsonify({'status': 'ok', 'data': chart_data})
     except Exception as e:
         print(f"[DASH] Chart Data Error: {e}")
         return jsonify({'candles': [], 'ema_50': [], 'error': str(e)})
@@ -376,7 +488,9 @@ def api_chart_markers():
                 # CCXT unified or Bybit raw returns createdTime in ms or entry time
                 # However `get_positions()` mapped `entry_time` if available, wait, `get_positions` uses `created_time_ms`
                 # Let's just put it at the end (current time) if we don't have exact timestamp, or fetch from dict
-                ts = int(p.get('entry_time', time.time()))
+                ts = int(p.get('entry_time', 0))
+                if ts == 0:
+                    ts = int(time.time())
                 side_str = p['side'].upper()
                 markers.append({
                     'time': ts,

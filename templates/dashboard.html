@@ -635,11 +635,12 @@
                 </div>
             </div>
             <div id="tvchart" style="flex: 1; position: relative; width: 100%;"></div>
+            <div id="tvchart-indicators" style="height: 150px; flex-shrink: 0; position: relative; width: 100%; border-top: 1px solid var(--border);"></div>
         </div>
 
         <div class="card grid-full">
             <div class="card-header"><span class="card-icon">🧠</span> Raw Intel Feed (Nexus Transparency)</div>
-            <div id="intel-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+            <div id="intel-container" style="display: block;">
                 <div style="color: var(--text-muted); font-size: 0.8rem; padding: 1rem;">Waiting for source data...</div>
             </div>
         </div>
@@ -858,100 +859,80 @@
                 const intel = data.raw_intel;
 
                 if (intel) {
-                    let htmlContent = '';
+                    let htmlContent = `<div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--border); color: var(--text-muted);">
+                                    <th style="padding-bottom: 0.5rem;">Źródło (Source)</th>
+                                    <th style="padding-bottom: 0.5rem;">Ostatnia Aktualizacja (Time)</th>
+                                    <th style="padding-bottom: 0.5rem; text-align: right;">Sentyment (Bias)</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                            
+                    const getSentimentHtml = (s) => {
+                        if (!s) return '<span style="color: var(--text-muted);">N/A</span>';
+                        const lower = s.toLowerCase();
+                        if (lower.includes('bull') || lower.includes('long') || lower === 'buy') return `<span style="color: var(--green); font-weight: bold;">BULLISH 🟢</span>`;
+                        if (lower.includes('bear') || lower.includes('short') || lower === 'sell') return `<span style="color: var(--red); font-weight: bold;">BEARISH 🔴</span>`;
+                        return `<span style="color: var(--yellow); font-weight: bold;">NEUTRAL 🟡</span>`;
+                    };
 
-                    // Module 1: Video Analysis
                     if (intel.video) {
-                        const v = intel.video;
-                        let sentimentColor = v.sentiment === 'bullish' ? 'var(--green)' : (v.sentiment === 'bearish' ? 'var(--red)' : 'var(--yellow)');
                         htmlContent += `
-                        <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                <strong style="color: #a855f7; font-size: 0.8rem;">🎥 Video Analysis (Telegram)</strong>
-                                <span style="font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: 1rem;">Certainty: ${v.certainty}/10</span>
-                            </div>
-                            <div style="font-size: 0.85rem; margin-bottom: 0.5rem;">Sentiment: <strong style="color: ${sentimentColor}; text-transform: uppercase;">${v.sentiment}</strong></div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">${v.analysis || 'No description'}</div>
-                            <div style="font-size: 0.75rem; font-family: var(--mono); color: #7dd3fc;">Key Levels: ${v.key_levels ? v.key_levels.map(l => l.level).join(', ') : 'None'}</div>
-                        </div>`;
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <td style="padding: 0.7rem 0;"><strong style="color: #a855f7;">🎥 YouTube / Wideo</strong> <span style="font-size:0.7rem; color:var(--text-muted); display:block;">${intel.video.source || 'Kanały analityczne'}</span></td>
+                                <td style="padding: 0.7rem 0; color: var(--text-muted);">${intel.video.time || 'N/A'}</td>
+                                <td style="padding: 0.7rem 0; text-align: right;">${getSentimentHtml(intel.video.sentiment)}</td>
+                            </tr>`;
                     }
-
-                    // Module 2: Macro Report (Email)
                     if (intel.email) {
                         const e = intel.email;
+                        const dDate = e.last_update ? new Date(e.last_update).toLocaleTimeString() : 'N/A';
                         htmlContent += `
-                        <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                <strong style="color: #3b82f6; font-size: 0.8rem;">📧 Macro Report (Email)</strong>
-                                <span style="font-size: 0.7rem; color: var(--text-muted);">${e.source || ''}</span>
-                            </div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">${e.content || 'No content'}</div>
-                            <div style="font-size: 0.7rem; color: #7dd3fc; font-family: var(--mono);">Update: ${e.last_update ? new Date(e.last_update).toLocaleString() : 'Unknown'}</div>
-                        </div>`;
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <td style="padding: 0.7rem 0;"><strong style="color: #3b82f6;">📧 Raport Makroekonomiczny</strong> <span style="font-size:0.7rem; color:var(--text-muted); display:block;">${e.source || 'Newsletter (Email)'}</span></td>
+                                <td style="padding: 0.7rem 0; color: var(--text-muted);">${dDate}</td>
+                                <td style="padding: 0.7rem 0; text-align: right;">${getSentimentHtml(e.sentiment || 'Neutral')}</td>
+                            </tr>`;
                     }
-
-                    // Module 3: Telegram Signals (Alpha Scraper)
                     if (intel.telegram && intel.telegram.signals) {
                         const tg = intel.telegram;
+                        const tTime = tg.signals.length > 0 ? tg.signals[0].time : 'N/A';
+                        let longs = 0, shorts = 0;
+                        tg.signals.forEach(s => {
+                            if(s.action === 'LONG') longs++;
+                            if(s.action === 'SHORT') shorts++;
+                        });
+                        let tgSent = 'Neutral';
+                        if (longs > shorts) tgSent = 'Bullish';
+                        if (shorts > longs) tgSent = 'Bearish';
                         htmlContent += `
-                        <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                <strong style="color: #0ea5e9; font-size: 0.8rem;">💬 Telegram Scraper</strong>
-                                <span style="font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: 1rem;">Active Signals: ${tg.signals.length}</span>
-                            </div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">
-                                Recent detected tickers:
-                            </div>
-                            <div style="font-size: 0.75rem; color: var(--text);">
-                                ${tg.signals.slice(0, 4).map(s => `• <strong>${s.symbol}</strong>: ${s.action} (Detected: ${s.time})`).join('<br>')}
-                            </div>
-                        </div>`;
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <td style="padding: 0.7rem 0;"><strong style="color: #0ea5e9;">💬 Telegram Scraper</strong> <span style="font-size:0.7rem; color:var(--text-muted); display:block;">Grupy VIP / Sygnałowe</span></td>
+                                <td style="padding: 0.7rem 0; color: var(--text-muted);">${tTime}</td>
+                                <td style="padding: 0.7rem 0; text-align: right;">${getSentimentHtml(tgSent)}</td>
+                            </tr>`;
                     }
-
-                    // Module 4: RSS & Social Sentiment
                     if (intel.rss) {
-                        const rss = intel.rss;
                         htmlContent += `
-                        <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                <strong style="color: #f97316; font-size: 0.8rem;">📰 Social Sentiment & RSS</strong>
-                                <span style="font-size: 0.7rem; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: 1rem;">Update: ${rss.time || 'None'}</span>
-                            </div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">
-                                Recent headlines / liquidation data:
-                            </div>
-                            <div style="font-size: 0.75rem; color: var(--text);">
-                                ${(rss.news || []).slice(0, 3).map(n => `> ${n}`).join('<br>')}
-                            </div>
-                        </div>`;
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <td style="padding: 0.7rem 0;"><strong style="color: #f97316;">📰 Social & News</strong> <span style="font-size:0.7rem; color:var(--text-muted); display:block;">Twitter (X) / Kanały RSS</span></td>
+                                <td style="padding: 0.7rem 0; color: var(--text-muted);">${intel.rss.time || 'N/A'}</td>
+                                <td style="padding: 0.7rem 0; text-align: right;">${getSentimentHtml(intel.rss.sentiment || 'Neutral')}</td>
+                            </tr>`;
                     }
-
-                    // Module 5: Technical Analysis (Binance source)
                     if (intel.ta) {
-                        const ta = intel.ta;
                         htmlContent += `
-                        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid var(--green); border-radius: 0.5rem; padding: 1rem;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                <strong style="color: var(--green); font-size: 0.8rem;">📈 Binance Indicators (TA)</strong>
-                                <span style="font-size: 0.75rem; font-weight: bold; color: ${ta.trend === 'BULLISH' ? 'var(--green)' : 'var(--red)'};">${ta.trend || 'NEUTRAL'}</span>
-                            </div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">
-                                Regime: <strong>${ta.regime || '--'}</strong>
-                            </div>
-                            <div style="font-size: 0.75rem; font-family: var(--mono); color: #7dd3fc; display: grid; grid-template-columns: 1fr; gap: 0.4rem;">
-                                <span>RSI: ${ta.rsi || '--'}</span>
-                                <span>EMA: ${ta.ema || '--'}</span>
-                                <span>ADX (Trend Strength): <strong>${ta.adx || '--'}</strong></span>
-                                <span>ATR (Volatility): <strong>${ta.atr || '--'}</strong></span>
-                            </div>
-                        </div>`;
+                            <tr>
+                                <td style="padding: 0.7rem 0;"><strong style="color: var(--green);">📈 Analiza Techniczna</strong> <span style="font-size:0.7rem; color:var(--text-muted); display:block;">API Binance (Algorytm)</span></td>
+                                <td style="padding: 0.7rem 0; color: var(--text-muted);">Real-time</td>
+                                <td style="padding: 0.7rem 0; text-align: right;">${getSentimentHtml(intel.ta.trend)}</td>
+                            </tr>`;
                     }
 
-                    if (htmlContent !== '') {
-                        intelBox.innerHTML = htmlContent;
-                    } else {
-                        intelBox.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem; padding: 1rem;">No raw data available (JSON files empty or missing).</div>';
-                    }
+                    htmlContent += `</tbody></table></div>`;
+                    intelBox.innerHTML = htmlContent;
                 }
 
                 // --- Timestamp ---
@@ -964,8 +945,11 @@
         }
         // --- CHART MODULE JS ---
         let chart = null;
+        let chartInd = null;
         let candleSeries = null;
         let emaSeries = null;
+        let rsiSeries = null;
+        let adxSeries = null;
         let currentChartSymbol = 'BTCUSDT';
         let currentChartTimeframe = '15m';
 
@@ -992,6 +976,7 @@
                     timeVisible: true,
                     secondsVisible: false,
                     borderColor: 'rgba(197, 203, 206, 0.8)',
+                    visible: false, // Ukrywamy górną oś, żeby tylko dolny wykres miał daty
                 },
                 crosshair: {
                     mode: LightweightCharts.CrosshairMode.Normal,
@@ -1016,9 +1001,66 @@
                 title: 'EMA 50',
             });
 
+            // Indicators chart
+            const indContainer = document.getElementById('tvchart-indicators');
+            chartInd = LightweightCharts.createChart(indContainer, {
+                height: 150,
+                layout: {
+                    background: { type: 'solid', color: 'transparent' },
+                    textColor: '#d1d4dc',
+                },
+                grid: {
+                    vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
+                    horzLines: { color: 'rgba(42, 46, 57, 0.5)' },
+                },
+                timeScale: {
+                    timeVisible: true,
+                    secondsVisible: false,
+                    borderColor: 'rgba(197, 203, 206, 0.8)',
+                },
+                rightPriceScale: {
+                    borderColor: 'rgba(197, 203, 206, 0.8)',
+                },
+            });
+
+            rsiSeries = chartInd.addLineSeries({
+                color: '#f97316',
+                lineWidth: 1.5,
+                title: 'RSI',
+            });
+            rsiSeries.createPriceLine({ price: 70, color: 'rgba(249, 115, 22, 0.4)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed });
+            rsiSeries.createPriceLine({ price: 30, color: 'rgba(249, 115, 22, 0.4)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed });
+
+            adxSeries = chartInd.addLineSeries({
+                color: '#0ea5e9',
+                lineWidth: 1.5,
+                title: 'ADX',
+            });
+            adxSeries.createPriceLine({ price: 20, color: 'rgba(14, 165, 233, 0.4)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed });
+
+            // Sync charts perfectly
+            let isSyncingTop = false;
+            let isSyncingBottom = false;
+
+            chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+                if (range !== null && !isSyncingTop) {
+                    isSyncingBottom = true;
+                    chartInd.timeScale().setVisibleLogicalRange(range);
+                    isSyncingBottom = false;
+                }
+            });
+            chartInd.timeScale().subscribeVisibleLogicalRangeChange(range => {
+                if (range !== null && !isSyncingBottom) {
+                    isSyncingTop = true;
+                    chart.timeScale().setVisibleLogicalRange(range);
+                    isSyncingTop = false;
+                }
+            });
+
             // Handle window resize
             window.addEventListener('resize', () => {
                 chart.resize(chartContainer.clientWidth, chartContainer.clientHeight);
+                chartInd.resize(indContainer.clientWidth, 150);
             });
             
             fetchChartData();
@@ -1034,12 +1076,30 @@
             if(!chart) return;
             fetch(`/api/chart_data?symbol=${currentChartSymbol}&timeframe=${currentChartTimeframe}`)
                 .then(r => r.json())
-                .then(data => {
-                    if (data.candles && data.candles.length > 0) {
-                        candleSeries.setData(data.candles);
-                        if (data.ema_50 && data.ema_50.length > 0) {
-                            emaSeries.setData(data.ema_50);
-                        }
+                .then(res => {
+                    if (res.data && res.data.length > 0) {
+                        const klines = [];
+                        const emas = [];
+                        const rsis = [];
+                        const adxs = [];
+                        
+                        res.data.forEach(d => {
+                            klines.push({time: d.time, open: d.open, high: d.high, low: d.low, close: d.close});
+                            if (d.ema50 !== undefined) emas.push({time: d.time, value: d.ema50});
+                            
+                            // Używamy "whitespace data" (tylko czas, bez value) aby zachować indeksy logiczne!
+                            if (d.rsi !== undefined) rsis.push({time: d.time, value: d.rsi});
+                            else rsis.push({time: d.time});
+                            
+                            if (d.adx !== undefined) adxs.push({time: d.time, value: d.adx});
+                            else adxs.push({time: d.time});
+                        });
+                        
+                        candleSeries.setData(klines);
+                        emaSeries.setData(emas);
+                        rsiSeries.setData(rsis);
+                        adxSeries.setData(adxs);
+                        
                         fetchChartMarkers();
                     }
                 })

@@ -2188,8 +2188,8 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                 if order_res and (order_res.get('orderId') or order_res.get('id')):
                     final_order_id = order_res.get('orderId') or order_res.get('id')
                     
-                    # V24.0: Set Native Bybit Trailing Stop (Trailing distance = 1.5 ATR)
-                    trailing_distance = round(atr * 1.5, price_precision)
+                    # V24.0: Set Native Bybit Trailing Stop (Trailing distance = 2.5 ATR)
+                    trailing_distance = round(atr * 2.5, price_precision)
                     # Activate it ONLY after hitting the AI's designated Take Profit level
                     active_prc = tp_price
                     bybit.set_trailing_stop(symbol, trailing_dist=trailing_distance, active_price=active_prc)
