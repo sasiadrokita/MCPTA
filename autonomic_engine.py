@@ -708,6 +708,66 @@ def calculate_adx(klines, period=14):
         
     return adx
 
+def calculate_fibonacci_levels(klines, lookback=100):
+    if len(klines) < lookback:
+        lookback = len(klines)
+    if lookback < 10:
+        return None
+        
+    recent_klines = klines[-lookback:]
+    highs = [k['high'] for k in recent_klines]
+    lows = [k['low'] for k in recent_klines]
+    
+    swing_high = max(highs)
+    swing_low = min(lows)
+    
+    if swing_high == swing_low:
+        return None
+        
+    diff = swing_high - swing_low
+    current_price = klines[-1]['close']
+    
+    # Determine the direction of the recent swing
+    high_idx = highs.index(swing_high)
+    low_idx = lows.index(swing_low)
+    
+    swing_dir = "UP" if low_idx < high_idx else "DOWN"
+    
+    if swing_dir == "UP":
+        fibs = {
+            "0.0": swing_high,
+            "0.382": swing_high - 0.382 * diff,
+            "0.500": swing_high - 0.500 * diff,
+            "0.618": swing_high - 0.618 * diff,
+            "0.786": swing_high - 0.786 * diff,
+            "1.0": swing_low
+        }
+    else:
+        fibs = {
+            "0.0": swing_low,
+            "0.382": swing_low + 0.382 * diff,
+            "0.500": swing_low + 0.500 * diff,
+            "0.618": swing_low + 0.618 * diff,
+            "0.786": swing_low + 0.786 * diff,
+            "1.0": swing_high
+        }
+        
+    tol = 0.05 * diff
+    active_zone = None
+    for level, val in fibs.items():
+        if level in ["0.0", "1.0"]: continue
+        if abs(current_price - val) <= tol:
+            active_zone = level
+            break
+            
+    return {
+        "swing_dir": swing_dir,
+        "swing_high": swing_high,
+        "swing_low": swing_low,
+        "levels": fibs,
+        "active_zone": active_zone
+    }
+
 def detect_sfp(klines, lookback=20):
     """
     V21.0: Detects Swing Failure Pattern (SFP).
@@ -1898,6 +1958,19 @@ def evaluate_market_condition(symbol, current_price):
             ema_1h_distance_atr = (current_price - ema_1h) / atr if atr > 0 else 0
             macro_ema_distance_atr = (current_price - macro_ema) / atr if atr > 0 else 0
 
+            # --- FIBONACCI RETRACEMENT ---
+            fib_data = calculate_fibonacci_levels(klines, lookback=100)
+            fib_str = ""
+            if fib_data:
+                fib_str = f"[Fibonacci Retracement ZONES]\n"
+                fib_str += f"- Swing {fib_data['swing_dir']}: {fib_data['swing_low']:.4f} to {fib_data['swing_high']:.4f} (diff: {abs(fib_data['swing_high']-fib_data['swing_low']):.4f})\n"
+                fib_str += f"- Current Price: {current_price:.4f}\n"
+                if fib_data['active_zone']:
+                    fib_str += f"- 🎯 Price is currently sitting AT the {fib_data['active_zone']} Fib level ({fib_data['levels'][fib_data['active_zone']]:.4f}).\n"
+                else:
+                    fib_str += f"- Price is floating between Fib levels.\n"
+                fib_str += f"- Golden Pocket (0.618) is at {fib_data['levels']['0.618']:.4f}.\n"
+
             prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
 {intent_str}
 
@@ -1952,6 +2025,7 @@ QUANTITATIVE METRICS:
 
 TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
 
+{fib_str}
 [15m — Entry Timeframe]
 - Price: {current_price:.4f} | RSI: {rsi:.2f} {"⚠️ OVERSOLD" if rsi < 30 else "⚠️ OVERBOUGHT" if rsi > 70 else "✅ Neutral"} | ATR: {atr:.4f}
 - EMA({params['ema_period']}): {ema:.4f} {"↑ price ABOVE EMA (bullish 15m)" if current_price > ema else "↓ price BELOW EMA (bearish 15m)"}
