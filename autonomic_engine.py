@@ -1364,6 +1364,8 @@ def process_message(ws, message):
         
         if k.get('confirm'):
             GLOBAL_STATE['klines_cache'][symbol][-1]["is_closed"] = True
+            # Trigger AI evaluation on 15m candle close
+            threading.Thread(target=evaluate_market_condition, args=(symbol, current_price), daemon=True).start()
             
         # Heartbeat
         GLOBAL_STATE['msg_counter'][symbol] += 1
