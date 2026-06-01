@@ -1231,7 +1231,7 @@ def update_trailing_stop(symbol, current_price, params, atr):
 _report_lock = threading.Lock()
 
 def background_tasks():
-    global GLOBAL_STATE
+    global GLOBAL_STATE, learn_data
     while True:
         try:
             now = time.time()
