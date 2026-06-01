@@ -280,8 +280,9 @@ class BybitGateway:
         V24.0: Retrieves Funding Rate and approximate CVD (last 500 trades) for AI Context.
         """
         try:
-            raw_sym = symbol.replace('/', '').split(':')[0]
-            linear_sym = f"{raw_sym}/USDT:USDT" if '/' not in symbol else symbol
+            # Fix CCXT format: e.g. BTCUSDT -> BTC/USDT:USDT
+            raw_sym = symbol.replace('/', '').split(':')[0].replace('USDT', '')
+            linear_sym = f"{raw_sym}/USDT:USDT"
             
             funding_rate = 0.0
             try:
