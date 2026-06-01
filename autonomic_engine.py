@@ -1888,7 +1888,16 @@ def evaluate_market_condition(symbol, current_price):
             else:
                 rm_guideline = f"Standard ATR is {atr:.4f}. You have full autonomy to place SL behind structural wicks (SFP) or recent swings."
 
+            # --- INTENT MEMORY ---
+            intent_memory = learn_data.get("intent_memory", {}).get(symbol, "")
+            intent_str = f"🎯 ACTIVE PLAN (CONTINUITY): {intent_memory}\n" if intent_memory else ""
+
+            # --- MULTI-TF EMA EXTENSIONS ---
+            ema_1h_distance_atr = (current_price - ema_1h) / atr if atr > 0 else 0
+            macro_ema_distance_atr = (current_price - macro_ema) / atr if atr > 0 else 0
+
             prompt = f"""You are Antigravity AI {version.FULL_VERSION}. {autonomy_hint}
+{intent_str}
 
 ╔══════════════════════════════════════════════════════╗
 ║  PRIME DIRECTIVE: MAKE MONEY. PROTECT CAPITAL.      ║
@@ -1949,14 +1958,17 @@ TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
 
 [1H — Swing Context]
 - EMA(1H): {ema_1h:.4f} {"↑ bullish 1H trend" if current_price > ema_1h > 0 else "↓ bearish 1H trend" if ema_1h > 0 else "N/A"}
+- 1H EMA Extension: {ema_1h_distance_atr:.2f} ATR
 - RSI(1H): {rsi_1h:.2f} {"⚠️ OVERSOLD 1H" if rsi_1h < 35 else "⚠️ OVERBOUGHT 1H" if rsi_1h > 65 else ""}
 
 [4H — Macro Structure]
 - EMA(4H): {macro_ema:.4f} {"↑ MACRO BULLISH (price > 4H EMA)" if macro_trend_bullish else "↓ MACRO BEARISH (price < 4H EMA)"}
+- 4H EMA Extension: {macro_ema_distance_atr:.2f} ATR
 
 [Multi-TF Alignment]
 {"✅ ALL BULLISH — 15m+1H+4H aligned UP: strong LONG confirmation" if (current_price > ema and current_price > ema_1h and macro_trend_bullish) else "🔴 ALL BEARISH — 15m+1H+4H aligned DOWN: strong SHORT confirmation" if (current_price < ema and current_price < ema_1h and not macro_trend_bullish) else "⚠️ MIXED TIMEFRAMES — DO NOT force a trade, wait for alignment or rely on strongest signal"}
 * COUNTER-TREND SCALPING: If the market is severely OVEREXTENDED, you are PERMITTED to open a counter-trend MEAN-REVERSION trade (e.g. LONG in a BEARISH macro) if SFP or divergence is present. Target the 15m EMA as Take Profit.
+* REVERSAL CONFIRMATION: If executing a pullback strategy, verify if CVD (Orderflow) confirms the rejection (e.g. positive CVD on bottom).
 
 NEXUS INTELLIGENCE:
 - Macro Bias: {nexus_state.get('macro_bias', 'NEUTRAL')} | Score: {nexus_state.get('nexus_score', 5.0)}/10
@@ -2006,6 +2018,21 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
             ai_reason = decision.get("reason", "No reasoning")
             ai_sl = decision.get("sl_price")
             ai_tp = decision.get("tp_price")
+
+            # --- INTENT MEMORY SAVING ---
+            reason_lower = ai_reason.lower()
+            if ai_action == "HOLD":
+                if "overextend" in reason_lower or "chasing" in reason_lower or "pullback" in reason_lower:
+                    if is_overextended_short:
+                        learn_data.setdefault("intent_memory", {})[symbol] = "WAITING FOR PULLBACK TO EMA TO ENTER SHORT"
+                    elif is_overextended_long:
+                        learn_data.setdefault("intent_memory", {})[symbol] = "WAITING FOR PULLBACK TO EMA TO ENTER LONG"
+                # else keep whatever intent was there, or maybe we just don't clear it immediately
+            elif ai_action in ["LONG", "SHORT"]:
+                # If we entered a trade, clear the intent memory
+                if "intent_memory" in learn_data and symbol in learn_data["intent_memory"]:
+                    learn_data["intent_memory"][symbol] = ""
+            save_learning_data(learn_data)
 
             if BOT_MEMORY_OK:
                 try:
