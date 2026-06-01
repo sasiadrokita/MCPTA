@@ -1437,17 +1437,25 @@ def process_message(ws, message):
 
         # Trailing Stop update (MOVE TO THREAD TO PREVENT WSS BLOCK)
         if GLOBAL_STATE['open_trades'][symbol]["active"]:
-             def bg_update_ts(sym, price):
-                 try:
-                     learn_data = load_learning_data()
-                     params = learn_data.get("parameters", {}).get(sym, {})
-                     if params and len(GLOBAL_STATE['klines_cache'][sym]) > params.get('atr_period', 14):
-                         atr = calculate_atr(GLOBAL_STATE['klines_cache'][sym], params['atr_period'])
-                         update_trailing_stop(sym, price, params, atr)
-                 except Exception as e:
-                     print(f"[BG TS ERROR] {sym}: {e}")
+             if "last_ts_update" not in GLOBAL_STATE:
+                 GLOBAL_STATE["last_ts_update"] = {}
              
-             threading.Thread(target=bg_update_ts, args=(symbol, current_price), daemon=True).start()
+             now_ts = time.time()
+             # Throttle: Only update Trailing Stop max once every 3 seconds to prevent thread/IO explosion
+             if now_ts - GLOBAL_STATE["last_ts_update"].get(symbol, 0) > 3.0:
+                 GLOBAL_STATE["last_ts_update"][symbol] = now_ts
+                 
+                 def bg_update_ts(sym, price):
+                     global learn_data
+                     try:
+                         params = learn_data.get("parameters", {}).get(sym, {})
+                         if params and len(GLOBAL_STATE['klines_cache'][sym]) > params.get('atr_period', 14):
+                             atr = calculate_atr(GLOBAL_STATE['klines_cache'][sym], params['atr_period'])
+                             update_trailing_stop(sym, price, params, atr)
+                     except Exception as e:
+                         print(f"[BG TS ERROR] {sym}: {e}")
+                 
+                 threading.Thread(target=bg_update_ts, args=(symbol, current_price), daemon=True).start()
 
     elif topic == "position":
         for pos in data_list:
