@@ -1872,6 +1872,17 @@ def evaluate_market_condition(symbol, current_price):
             # Calculate basic ATR references for the prompt (as guidelines, not strict limits)
             atr_ref_sl_wide = atr * 2.5
             
+            # --- OVEREXTENSION LOGIC ---
+            ema_distance_atr = (current_price - ema) / atr if atr > 0 else 0
+            is_overextended_long = ema_distance_atr > 2.0
+            is_overextended_short = ema_distance_atr < -2.0
+            
+            overextension_warning = ""
+            if is_overextended_long:
+                overextension_warning = f"⚠️ OVEREXTENDED UPWARDS: Price is +{ema_distance_atr:.2f} ATR above 15m EMA! DANGER: High probability of mean-reversion pullback."
+            elif is_overextended_short:
+                overextension_warning = f"⚠️ OVEREXTENDED DOWNWARDS: Price is {ema_distance_atr:.2f} ATR below 15m EMA! DANGER: High probability of mean-reversion pullback."
+            
             if market_regime == "VOLATILE_CHOP":
                 rm_guideline = f"Market is CHOPPY. If you must trade, use a wider SL (e.g. ~{atr_ref_sl_wide:.4f} distance) and scale down."
             else:
@@ -1895,6 +1906,7 @@ You MUST return "action": "HOLD" and abort the trade if ANY of the following are
 1. CHOP / WEAK TREND: If Regime is 'VOLATILE_CHOP' OR ('RANGE_BOUND' and ADX < 20) -> RETURN HOLD.
 2. LESSON OVERRIDE: If any CONDITIONAL LESSON (★ REGIME MATCH) says "AVOID LONG" and you consider LONG -> RETURN HOLD. Same for SHORT.
 3. ORDER BOOK / CVD CONTRADICTION: If considering LONG but Order Book Imbalance is 'ASKS', or considering SHORT but 'BIDS' -> RETURN HOLD.
+4. NO CHASING (OVEREXTENSION): If considering LONG but price is OVEREXTENDED UPWARDS, or considering SHORT but OVEREXTENDED DOWNWARDS -> RETURN HOLD. Do not buy the top or short the bottom!
 
 You have access to the following intelligence sources — use ALL of them:
   1. ELLIOTT WAVE: structural market geometry, wave position, expected next move
@@ -1932,6 +1944,7 @@ TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
 [15m — Entry Timeframe]
 - Price: {current_price:.4f} | RSI: {rsi:.2f} {"⚠️ OVERSOLD" if rsi < 30 else "⚠️ OVERBOUGHT" if rsi > 70 else "✅ Neutral"} | ATR: {atr:.4f}
 - EMA({params['ema_period']}): {ema:.4f} {"↑ price ABOVE EMA (bullish 15m)" if current_price > ema else "↓ price BELOW EMA (bearish 15m)"}
+- EMA Extension: {ema_distance_atr:.2f} ATR distance from EMA. {overextension_warning}
 - Regime: {market_regime} | ADX: {adx:.2f} {"⚠️ WEAK TREND — avoid new entries" if adx < 20 else "✅ TREND CONFIRMED"}
 
 [1H — Swing Context]
@@ -1943,6 +1956,7 @@ TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
 
 [Multi-TF Alignment]
 {"✅ ALL BULLISH — 15m+1H+4H aligned UP: strong LONG confirmation" if (current_price > ema and current_price > ema_1h and macro_trend_bullish) else "🔴 ALL BEARISH — 15m+1H+4H aligned DOWN: strong SHORT confirmation" if (current_price < ema and current_price < ema_1h and not macro_trend_bullish) else "⚠️ MIXED TIMEFRAMES — DO NOT force a trade, wait for alignment or rely on strongest signal"}
+* COUNTER-TREND SCALPING: If the market is severely OVEREXTENDED, you are PERMITTED to open a counter-trend MEAN-REVERSION trade (e.g. LONG in a BEARISH macro) if SFP or divergence is present. Target the 15m EMA as Take Profit.
 
 NEXUS INTELLIGENCE:
 - Macro Bias: {nexus_state.get('macro_bias', 'NEUTRAL')} | Score: {nexus_state.get('nexus_score', 5.0)}/10
@@ -1958,7 +1972,7 @@ ACTIVE POSITION ON {symbol}:
 
 ═══════════════════════════════════════════════════════
 RISK MANAGEMENT — HARD RULES:
-- ⚠️ SL MUST be at least {atr:.4f} (1 ATR) away from entry. NEVER place SL closer than this. If your structural level is tighter than 1 ATR, DO NOT take the trade.
+- ⚠️ SL MUST be at least {atr * 2.0:.4f} (2.0 ATR) away from entry. NEVER place SL closer than this. Tight SLs result in premature exits on noise/wicks. If your structural level is tighter than 2.0 ATR, DO NOT take the trade.
 - TP MUST give a Risk:Reward ratio of at least 2.0. If R:R < 2.0, DO NOT take the trade.
 - {rm_guideline}
 - Recommended SL placement: behind the most recent swing low/high or SFP wick, typically 1.5–2.5x ATR from entry.
@@ -2090,8 +2104,8 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                     if not is_test_mission:
                         # === v23.8 SL/TP ENFORCEMENT (ATR-based floors) ===
                         max_allowed_risk = current_price * 0.10  # Cap: 10% max
-                        min_sl_distance = atr * 1.0               # Floor: 1.0x ATR minimum
-                        min_rr = 2.0                              # Minimum Risk:Reward ratio
+                        min_sl_distance = atr * 2.0               # Floor: 2.0x ATR minimum
+                        min_rr = 1.5                              # Minimum Risk:Reward ratio
 
                         # --- SL CAP (Absurdly wide → 10% max) ---
                         if risk_dist > max_allowed_risk:
@@ -2113,7 +2127,7 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                             risk_dist = abs(current_price - sl_price)
                             print(
                                 f"[{symbol}] SL ATR FLOOR: {old_sl} → {sl_price} "
-                                f"(AI placed SL at {abs(current_price - old_sl)/atr:.2f}x ATR, enforced to 1.0x ATR = {min_sl_distance:.4f})",
+                                f"(AI placed SL at {abs(current_price - old_sl)/atr:.2f}x ATR, enforced to 2.0x ATR = {min_sl_distance:.4f})",
                                 flush=True
                             )
 

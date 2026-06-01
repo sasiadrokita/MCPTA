@@ -48,38 +48,48 @@ LOGS: {recent_logs}
 {user_feedback}
 
 --- TASK ---
-Update AI Lessons (Mental Notes). 
-CRITICAL Requirement: Compress the knowledge! A new lesson for a given symbol MUST HAVE A MAXIMUM OF 3 SHORT SENTENCES (bulleted). Remove old "noise" and aggressive tone. Focus only on pure tactics.
+Update AI Lessons (Mental Notes) and generate a comprehensive Polish Telegram report.
 
---- STRUCTURE (JSON ONLY) ---
+CRITICAL Requirement 1 (LESSONS): Compress the knowledge! A new lesson for a given symbol MUST HAVE A MAXIMUM OF 3 SHORT SENTENCES (bulleted) IN ENGLISH. Focus only on pure tactics. Remove old noise.
+CRITICAL Requirement 2 (TELEGRAM REPORT): Generate a highly detailed, beautifully formatted Polish Markdown report, matching the classic "Antigravity AI - Raport On-chain & Market Insights" format.
+
+--- STRUCTURE ---
+You MUST output EXACTLY two sections wrapped in specific tags.
+
+[REPORT START]
+🚀 Antigravity AI {version.FULL_VERSION} - Raport On-chain & Market Insights 🚀
+📅 Raport z dnia: [Dzisiejsza data]
+... (reszta raportu w polskim Markdown) ...
+[REPORT END]
+
+[JSON START]
 {{
-  "telegram_message": "MARKDOWN: Short session report. 2-3 sentences.",
-  "new_lessons": {{
-      "BTCUSDT": "- Point 1.\\n- Point 2.\\n- Point 3.",
-      "ETHUSDT": "- Point 1.\\n- Point 2.\\n- Point 3.",
-      "SOLUSDT": "...",
-      "LINKUSDT": "..."
-  }}
+  "BTCUSDT": "- Point 1.\\n- Point 2.\\n- Point 3.",
+  "ETHUSDT": "- Point 1.\\n- Point 2.\\n- Point 3."
 }}
+[JSON END]
 """
     print("Sending request to AI Gateway...", flush=True)
-    response_text = ai_generate(prompt, model='gemini-2.5-flash', response_mime='application/json', cache_key='reflection_session_v2', timeout=60)
+    response_text = ai_generate(prompt, model='gemini-2.5-flash', response_mime='text/plain', cache_key='reflection_session_v4', timeout=60)
     
     if not response_text:
         print("Error: AI Gateway returned no response.")
         return
 
-    # Robust JSON parsing
-    match = re.search(r'\{.*\}', response_text, re.DOTALL)
-    if not match:
-        print("Error: AI response does not contain valid JSON.")
-        return
+    # Extract Report
+    report_match = re.search(r'\[REPORT START\](.*?)\[REPORT END\]', response_text, re.DOTALL)
+    report_msg = report_match.group(1).strip() if report_match else "Reflection completed (Parsing error in report)."
+
+    # Extract JSON
+    json_match = re.search(r'\[JSON START\](.*?)\[JSON END\]', response_text, re.DOTALL)
+    new_lessons = {}
+    if json_match:
+        try:
+            new_lessons = json.loads(json_match.group(1), strict=False)
+        except Exception as e:
+            print(f"Error parsing JSON lessons: {e}")
 
     try:
-        ai_data = json.loads(match.group(0), strict=False)
-        report_msg = ai_data.get("telegram_message", "Reflection completed.")
-        
-        new_lessons = ai_data.get("new_lessons", {})
         if new_lessons:
             for symbol, consolidated_lesson in new_lessons.items():
                 if consolidated_lesson and len(consolidated_lesson) > 5:
@@ -89,7 +99,7 @@ CRITICAL Requirement: Compress the knowledge! A new lesson for a given symbol MU
             save_learning_data(learn_data)
             print(f"[REFL] Updated and compressed autonomic_learning.json.")
 
-        send_telegram_message(f"🧠 *AI SELF-REFLECTION SESSION*\n\n{report_msg}")
+        send_telegram_message(f"🧠 *AI SELF-REFLECTION SESSION*\n\n{report_msg}", force=True)
         
         from autonomic_engine import archive_to_black_box
         archive_to_black_box("POST-MORTEM REFLECTION SESSION", report_msg)
