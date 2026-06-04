@@ -1749,16 +1749,12 @@ def evaluate_market_condition(symbol, current_price):
                 
             # 4. Intent Tracking (Proximity to EMA)
             else:
-                intent_file = os.path.join(os.path.dirname(__file__), "intent_memory.json")
-                if os.path.exists(intent_file):
-                    with open(intent_file, 'r') as f:
-                        intent_data = json.load(f)
-                    active_intent = intent_data.get(symbol, "").lower()
-                    if "pullback" in active_intent or "ema" in active_intent:
-                        # Wake up if price is very close to Medium EMA (within 0.5 ATR)
-                        if abs(current_price - ema_medium) < (0.5 * atr):
-                            should_wake = True
-                            wake_reason = "Intent Proximity (Near EMA)"
+                active_intent = learn_data.get("intent_memory", {}).get(symbol, "").lower()
+                if "pullback" in active_intent or "ema" in active_intent:
+                    # Wake up if price is very close to Medium EMA (within 0.5 ATR)
+                    if abs(current_price - ema_medium) < (0.5 * atr):
+                        should_wake = True
+                        wake_reason = "Intent Proximity (Near EMA)"
             
             # If no open trades, and no wake reason, SKIP AI to save tokens
             if not should_wake and not GLOBAL_STATE['open_trades'][symbol]['active']:
