@@ -91,7 +91,7 @@ ORDER_EXECUTION_LOCK = threading.Lock()
 
 GLOBAL_STATE = {
     "klines_cache": {sym: [] for sym in SYMBOLS},
-    "last_ai_call": {sym: time.time() for sym in SYMBOLS},
+    "last_ai_call": {sym: 0 for sym in SYMBOLS},
     "last_close_time": {sym: 0 for sym in SYMBOLS}, # V21.9.0 Anti-Churn Lockdown
     "last_ai_price": {sym: 0 for sym in SYMBOLS},
     "is_evaluating_ai": {sym: False for sym in SYMBOLS},
@@ -1360,16 +1360,7 @@ def background_tasks():
                              last_p = GLOBAL_STATE['klines_cache'][symbol][-1]['close']
                              threading.Thread(target=evaluate_market_condition, args=(symbol, last_p), daemon=True).start()
 
-                # [v21.13.2] Reduced from 4h to 1h for better bot "learning"
-                if GLOBAL_STATE['open_trades'][symbol]['active']:
-                    continue # Skip forced pulse for active trades to prevent AI early exits
-
-                if now - GLOBAL_STATE['last_ai_call'][symbol] > 3600:
-                    print(f"[{symbol}] FORCED PULSE: No events for 60m. Forcing evaluation for data recording.", flush=True)
-                    GLOBAL_STATE['last_ai_call'][symbol] = now
-                    if GLOBAL_STATE['klines_cache'][symbol]:
-                        last_price = GLOBAL_STATE['klines_cache'][symbol][-1]['close']
-                        threading.Thread(target=evaluate_market_condition, args=(symbol, last_price), daemon=True).start()
+                pass
 
             if GLOBAL_STATE['listen_key']:
                 keepalive_listen_key()
