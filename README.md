@@ -25,6 +25,20 @@ This project was built to demonstrate advanced system architecture, asynchronous
 
 ## 🗓️ Changelog
 
+### v24.6.0 — *Gatekeeper* (2026-06-04)
+> Introduction of the Smart Trigger architecture to drastically reduce API token consumption and improve trade timing.
+
+**Core Engine (`autonomic_engine.py`):**
+- **Smart Triggers (Gatekeeper)** — The AI evaluation is now blocked by default unless specific market conditions are met:
+  - **Volatility Spikes**: Sudden RSI > 70 or < 30, or rapid price movements.
+  - **Intent Proximity**: Price approaches the 15m Medium EMA when the AI's active plan is "WAITING FOR PULLBACK".
+  - **Heartbeat**: A mandatory 4-hour system audit to refresh macro plans regardless of market activity.
+- **Multi-EMA Integration** — Replaced single EMA with Fast (20), Medium (50), and Macro (200) EMAs for enhanced cross-over detection and dynamic entry targets.
+- **Intent Memory Fixes** — AI's active plans ("alarms") are now correctly persisted in `autonomic_learning.json` and read by the Gatekeeper to trigger evaluations at precise price levels.
+- **Fixed RSI Display Bug** — Ensure true calculated RSI replaces the initial default 50.00 value in Global State.
+
+---
+
 ### v24.1.0 — *Visual Intelligence* (2026-05-30)
 > Complete overhaul of the frontend dashboard and charting logic.
 
