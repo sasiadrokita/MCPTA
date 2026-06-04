@@ -1672,6 +1672,7 @@ def evaluate_market_condition(symbol, current_price):
         ema_macro = calculate_ema(prices, params['ema_period'])
         ema = ema_macro # Keep for legacy fallback logic
         rsi = calculate_rsi(prices, params['rsi_period'])
+        GLOBAL_STATE['last_rsi'][symbol] = rsi
         atr = calculate_atr(klines, params.get('atr_period', 14))
         adx = calculate_adx(klines, params.get('adx_period', 14))
 
