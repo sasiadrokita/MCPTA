@@ -1732,6 +1732,56 @@ def evaluate_market_condition(symbol, current_price):
             print(f"[{symbol}] ANTI-CHURN LOCKOUT: Entry blocked for {remaining} more minutes.", flush=True)
             return
 
+        # === SMART TRIGGERS (GATEKEEPER) ===
+        try:
+            should_wake = False
+            wake_reason = ""
+            
+            last_ai_price = GLOBAL_STATE['last_ai_price'].get(symbol, current_price)
+            last_ai_time = GLOBAL_STATE['last_ai_call'].get(symbol, 0)
+            
+            # 1. Heartbeat Trigger (4 hours = 14400 seconds)
+            if now - last_ai_time > 14400:
+                should_wake = True
+                wake_reason = "Heartbeat (4h)"
+                
+            # 2. Indicator Trigger (Extreme RSI)
+            elif rsi < 30 or rsi > 70:
+                should_wake = True
+                wake_reason = f"Extreme RSI ({rsi:.1f})"
+                
+            # 3. Volatility/Price Movement Spike (> 0.5 ATR since last eval)
+            elif abs(current_price - last_ai_price) > (0.5 * atr):
+                should_wake = True
+                wake_reason = f"Volatility Spike (>0.5 ATR)"
+                
+            # 4. Intent Tracking (Proximity to EMA)
+            else:
+                intent_file = os.path.join(os.path.dirname(__file__), "intent_memory.json")
+                if os.path.exists(intent_file):
+                    with open(intent_file, 'r') as f:
+                        intent_data = json.load(f)
+                    active_intent = intent_data.get(symbol, "").lower()
+                    if "pullback" in active_intent or "ema" in active_intent:
+                        # Wake up if price is very close to Medium EMA (within 0.5 ATR)
+                        if abs(current_price - ema_medium) < (0.5 * atr):
+                            should_wake = True
+                            wake_reason = "Intent Proximity (Near EMA)"
+            
+            # If no open trades, and no wake reason, SKIP AI to save tokens
+            if not should_wake and not GLOBAL_STATE['open_trades'][symbol]['active']:
+                print(f"[{symbol}] GATEKEEPER: Market inactive. Skipping AI call to save tokens.", flush=True)
+                return
+                
+            # Update last eval state
+            GLOBAL_STATE['last_ai_price'][symbol] = current_price
+            GLOBAL_STATE['last_ai_call'][symbol] = now
+            if wake_reason:
+                print(f"[{symbol}] GATEKEEPER: Waking AI. Reason: {wake_reason}", flush=True)
+                
+        except Exception as e:
+            print(f"[{symbol}] GATEKEEPER ERROR: {e}. Defaulting to WAKE.")
+
         bal_data = get_balance()
         wallet_bal = bal_data['wallet']
         available = bal_data['available']
