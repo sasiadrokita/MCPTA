@@ -2051,7 +2051,7 @@ TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
 
 [Multi-TF Alignment]
 {"✅ ALL BULLISH — 15m+1H+4H aligned UP: strong LONG confirmation" if (current_price > ema and current_price > ema_1h and macro_trend_bullish) else "🔴 ALL BEARISH — 15m+1H+4H aligned DOWN: strong SHORT confirmation" if (current_price < ema and current_price < ema_1h and not macro_trend_bullish) else "⚠️ MIXED TIMEFRAMES — DO NOT force a trade, wait for alignment or rely on strongest signal"}
-* COUNTER-TREND SCALPING: You are PERMITTED to open a counter-trend MEAN-REVERSION trade ONLY IF the market is severely OVEREXTENDED AND you have ABSOLUTE CERTAINTY from multiple aligning indicators (e.g., SFP + strong Divergence + positive CVD/Orderflow all screaming reversal). If there is any doubt or conflicting signals, DO NOT override your Golden Rules. Target the 15m EMA as Take Profit.
+* COUNTER-TREND SCALPING: You are PERMITTED to open a counter-trend MEAN-REVERSION trade ONLY IF the market is severely OVEREXTENDED AND you have ABSOLUTE CERTAINTY from multiple aligning indicators (e.g., SFP + strong Divergence + positive CVD/Orderflow all screaming reversal). If there is any doubt or conflicting signals, DO NOT override your Golden Rules. DO NOT set a hard Take Profit at the 15m EMA. Instead, set a very wide initial TP and rely on the Trailing Stop to secure profits once the price crosses the 15m EMA, letting the winner run if a new trend starts.
 * REVERSAL CONFIRMATION: If executing a pullback strategy, verify if CVD (Orderflow) confirms the rejection (e.g. positive CVD on bottom).
 
 NEXUS INTELLIGENCE:
