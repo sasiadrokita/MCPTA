@@ -1676,7 +1676,10 @@ def evaluate_market_condition(symbol, current_price):
             klines = [{'close': current_price}]
 
         prices = [k['close'] for k in klines]
-        ema = calculate_ema(prices, params['ema_period'])
+        ema_fast = calculate_ema(prices, 20)
+        ema_medium = calculate_ema(prices, 50)
+        ema_macro = calculate_ema(prices, params['ema_period'])
+        ema = ema_macro # Keep for legacy fallback logic
         rsi = calculate_rsi(prices, params['rsi_period'])
         atr = calculate_atr(klines, params.get('atr_period', 14))
         adx = calculate_adx(klines, params.get('adx_period', 14))
@@ -1942,16 +1945,27 @@ def evaluate_market_condition(symbol, current_price):
             # Calculate basic ATR references for the prompt (as guidelines, not strict limits)
             atr_ref_sl_wide = atr * 2.5
             
+            # --- EMA CROSS LOGIC ---
+            ema_cross_status = "NEUTRAL"
+            if ema_fast > ema_medium and ema_fast > ema_macro:
+                ema_cross_status = "BULLISH (Fast > Medium > Macro)"
+            elif ema_fast < ema_medium and ema_fast < ema_macro:
+                ema_cross_status = "BEARISH (Fast < Medium < Macro)"
+            elif ema_fast > ema_medium:
+                ema_cross_status = "SHORT-TERM BULLISH (Fast > Medium)"
+            elif ema_fast < ema_medium:
+                ema_cross_status = "SHORT-TERM BEARISH (Fast < Medium)"
+
             # --- OVEREXTENSION LOGIC ---
-            ema_distance_atr = (current_price - ema) / atr if atr > 0 else 0
+            ema_distance_atr = (current_price - ema_medium) / atr if atr > 0 else 0
             is_overextended_long = ema_distance_atr > 2.0
             is_overextended_short = ema_distance_atr < -2.0
             
             overextension_warning = ""
             if is_overextended_long:
-                overextension_warning = f"⚠️ OVEREXTENDED UPWARDS: Price is +{ema_distance_atr:.2f} ATR above 15m EMA! DANGER: High probability of mean-reversion pullback."
+                overextension_warning = f"⚠️ OVEREXTENDED UPWARDS: Price is +{ema_distance_atr:.2f} ATR above 15m Medium EMA! DANGER: High probability of mean-reversion pullback."
             elif is_overextended_short:
-                overextension_warning = f"⚠️ OVEREXTENDED DOWNWARDS: Price is {ema_distance_atr:.2f} ATR below 15m EMA! DANGER: High probability of mean-reversion pullback."
+                overextension_warning = f"⚠️ OVEREXTENDED DOWNWARDS: Price is {ema_distance_atr:.2f} ATR below 15m Medium EMA! DANGER: High probability of mean-reversion pullback."
             
             if market_regime == "VOLATILE_CHOP":
                 rm_guideline = f"Market is CHOPPY. If you must trade, use a wider SL (e.g. ~{atr_ref_sl_wide:.4f} distance) and scale down."
@@ -2051,7 +2065,14 @@ TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
 
 [Multi-TF Alignment]
 {"✅ ALL BULLISH — 15m+1H+4H aligned UP: strong LONG confirmation" if (current_price > ema and current_price > ema_1h and macro_trend_bullish) else "🔴 ALL BEARISH — 15m+1H+4H aligned DOWN: strong SHORT confirmation" if (current_price < ema and current_price < ema_1h and not macro_trend_bullish) else "⚠️ MIXED TIMEFRAMES — DO NOT force a trade, wait for alignment or rely on strongest signal"}
-* COUNTER-TREND SCALPING: You are PERMITTED to open a counter-trend MEAN-REVERSION trade ONLY IF the market is severely OVEREXTENDED AND you have ABSOLUTE CERTAINTY from multiple aligning indicators (e.g., SFP + strong Divergence + positive CVD/Orderflow all screaming reversal). If there is any doubt or conflicting signals, DO NOT override your Golden Rules. DO NOT set a hard Take Profit at the 15m EMA. Instead, set a very wide initial TP and rely on the Trailing Stop to secure profits once the price crosses the 15m EMA, letting the winner run if a new trend starts.
+
+[EMA Cross Status (15m)]
+- Fast EMA (20): {ema_fast:.4f}
+- Medium EMA (50): {ema_medium:.4f}
+- Macro EMA (200): {ema_macro:.4f}
+- Status: {ema_cross_status}
+
+* COUNTER-TREND SCALPING: You are PERMITTED to open a counter-trend MEAN-REVERSION trade ONLY IF the market is severely OVEREXTENDED AND you have ABSOLUTE CERTAINTY from multiple aligning indicators (e.g., SFP + strong Divergence + positive CVD/Orderflow all screaming reversal). If there is any doubt or conflicting signals, DO NOT override your Golden Rules. DO NOT set a hard Take Profit at the 15m EMA. Instead, set a very wide initial TP and rely on the Trailing Stop to secure profits once the price crosses the 15m Medium EMA, letting the winner run if a new trend starts.
 * REVERSAL CONFIRMATION: If executing a pullback strategy, verify if CVD (Orderflow) confirms the rejection (e.g. positive CVD on bottom).
 
 NEXUS INTELLIGENCE:
