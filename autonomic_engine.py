@@ -2274,7 +2274,7 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                     if not is_test_mission:
                         # === v23.8 SL/TP ENFORCEMENT (ATR-based floors) ===
                         max_allowed_risk = current_price * 0.10  # Cap: 10% max
-                        min_sl_distance = atr * 2.0               # Floor: 2.0x ATR minimum
+                        min_sl_distance = atr * 4.0               # Floor: 4.0x ATR minimum
                         min_rr = 1.5                              # Minimum Risk:Reward ratio
 
                         # --- SL CAP (Absurdly wide → 10% max) ---
@@ -2374,8 +2374,9 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                     
                     # V24.0: Set Native Bybit Trailing Stop (Trailing distance = 4.0 ATR)
                     trailing_distance = round(atr * 4.0, price_precision)
-                    # Activate it ONLY after hitting the AI's designated Take Profit level
-                    active_prc = tp_price
+                    # Activate it ONLY after hitting the AI's designated Take Profit level?
+                    # V24.6.1 FIX: Activate it IMMEDIATELY so it trails from entry.
+                    active_prc = None
                     bybit.set_trailing_stop(symbol, trailing_dist=trailing_distance, active_price=active_prc)
                     print(f"[{symbol}] V24.0 TRAILING STOP PREPARED: Dist={trailing_distance}, Activates at TP={active_prc}", flush=True)
 
