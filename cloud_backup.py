@@ -3,7 +3,7 @@ import time
 import sqlite3
 import zipfile
 import glob
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from google.cloud import storage
 from dotenv import load_dotenv
 
@@ -127,7 +127,6 @@ def cleanup_old_backups(bucket_name):
         print(f"Error during cleanup: {e}")
 
 if __name__ == "__main__":
-    from datetime import timezone
     print(f"--- Antigravity Cloud Backup Started at {datetime.now()} ---")
     
     if not os.path.exists(TEMP_DIR):

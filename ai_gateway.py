@@ -12,7 +12,7 @@ def load_cache():
         try:
             with open(CACHE_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except:
+        except Exception:
             return {}
     return {}
 
@@ -88,3 +88,4 @@ def upload_and_analyze_video(file_path, prompt):
         return response.text
     except Exception as e:
         print(f"[AI GATEWAY] Video SDK error: {e}")
+        return None

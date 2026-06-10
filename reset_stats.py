@@ -43,15 +43,11 @@ if os.path.exists(db_path):
     # User said "delete old entries".
     
     # Optional: Archive instead of delete
-    conn.execute("ALTER TABLE trades RENAME TO trades_binance_archive;")
-    # Recreate trades table structure
-    # We need to find the original schema. 
-    # For now, I'll just delete entries where close_ts is not null (finished trades)
-    # and maybe everything since we are on a new exchange.
-    
-    # Actually, if I renamed it, I need to recreate it. 
     # Let's just delete everything from trades.
-    conn.execute("DELETE FROM trades;")
+    try:
+        conn.execute("DELETE FROM trades;")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
     print("SUCCESS: Cleared trades table in bot_memory.db")

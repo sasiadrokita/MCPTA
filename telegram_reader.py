@@ -1,9 +1,8 @@
 """
-Antigravity v12.0 – Telegram Public Channel Scraper
+Antigravity v24.6.0 – Telegram Public Channel Scraper
 Reads the public channel t.me/s/YOUR_CHANNEL_ID via HTTP (no login required).
 Parses messages and saves signals to the `channel_signals` buffer.
 """
-import asyncio
 import json
 import os
 import re

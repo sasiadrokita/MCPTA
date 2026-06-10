@@ -18,7 +18,8 @@ from datetime import datetime, timezone
 # --- CONFIGURATION ---
 MAX_CONSECUTIVE_LOSSES = 3      # block after this many consecutive losses
 COOLDOWN_HOURS = 4              # hours to block the pair/side after trigger
-STATE_FILE = "circuit_breaker_state.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATE_FILE = os.path.join(BASE_DIR, "circuit_breaker_state.json")
 
 _lock = threading.Lock()
 _state = {}   # { "SOLUSDT_SHORT": {"consecutive_losses": 2, "blocked_until": 0.0, "total_triggers": 1} }

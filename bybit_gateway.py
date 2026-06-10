@@ -79,33 +79,7 @@ class BybitGateway:
             print(f"[BYBIT] Order placement error: {e}")
             return None
 
-    def set_trailing_stop(self, symbol, side, callback_rate=1.0):
-        """
-        Sets Trailing Stop for an active position (Bybit V5).
-        callback_rate: percentage value (e.g. 1.0 = 1%)
-        """
-        try:
-            # Recalculate symbol and fetch ticker for price distance
-            ticker = self.exchange.fetch_ticker(symbol)
-            price = ticker['last']
-            # Bybit V5 requires price distance for Trailing Stop
-            ts_dist = str(round(price * (callback_rate / 100), 2))
-            
-            # Form request for Bybit V5 Position API
-            # side: 'Buy' for Long position, 'Sell' for Short position
-            params = {
-                'category': 'linear',
-                'symbol': symbol.replace('/', '').split(':')[0], # format BTCUSDT
-                'trailingStop': ts_dist,
-                'positionIdx': 0, # 0 for unhedged
-            }
-            
-            response = self.exchange.private_post_v5_position_trading_stop(params)
-            print(f"[BYBIT] Trailing Stop {callback_rate}% ({ts_dist}) set for {symbol}")
-            return response
-        except Exception as e:
-            print(f"[BYBIT] Trailing Stop setup error: {e}")
-            return None
+
 
     def get_positions(self):
         """v24.0: Fetches active positions and maps them to Dashboard format."""
@@ -206,7 +180,7 @@ class BybitGateway:
             })
             
             pnl_list = []
-            if res and res.get('retCode') == '0' and 'result' in res and 'list' in res['result']:
+            if res and str(res.get('retCode')) == '0' and 'result' in res and 'list' in res['result']:
                 for item in res['result']['list']:
                     pnl_list.append({
                         'symbol': item.get('symbol'),

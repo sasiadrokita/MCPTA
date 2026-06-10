@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 BotMemory — Persistent memory layer for the Antigravity system.
-Version: v21.13.0
+Version: v24.6.0
 
 Two storage types:
   1. SQLite  — Persistent storage for decisions, trades, and lessons (disk)
@@ -11,7 +11,6 @@ Two storage types:
 import sqlite3
 import json
 import os
-import time
 from datetime import datetime, timezone
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -127,18 +126,22 @@ def save_trade_close(symbol: str, exit_price: float, pnl: float,
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     try:
         with _get_conn() as conn:
-            if trade_id:
+            if trade_id is not None:
                 conn.execute(
                     "UPDATE trades SET close_ts=?, exit_price=?, pnl=?, close_reason=? WHERE id=?",
                     (ts, exit_price, pnl, close_reason, trade_id)
                 )
             else:
                 # fallback: find the latest open trade for the symbol
-                conn.execute(
-                    "UPDATE trades SET close_ts=?, exit_price=?, pnl=?, close_reason=? "
-                    "WHERE symbol=? AND close_ts IS NULL ORDER BY id DESC LIMIT 1",
-                    (ts, exit_price, pnl, close_reason, symbol)
-                )
+                row = conn.execute(
+                    "SELECT id FROM trades WHERE symbol=? AND close_ts IS NULL ORDER BY id DESC LIMIT 1",
+                    (symbol,)
+                ).fetchone()
+                if row:
+                    conn.execute(
+                        "UPDATE trades SET close_ts=?, exit_price=?, pnl=?, close_reason=? WHERE id=?",
+                        (ts, exit_price, pnl, close_reason, row['id'])
+                    )
     except Exception as e:
         print(f"[MEMORY] save_trade_close error: {e}")
 

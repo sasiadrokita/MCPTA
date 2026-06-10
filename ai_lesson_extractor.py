@@ -1,28 +1,18 @@
-import warnings; warnings.filterwarnings("ignore", category=FutureWarning)
 import os
 import json
 import threading
-import google.generativeai as genai
 from datetime import datetime, timezone
+import sqlite3
+
 import memory
+import ai_gateway
 
 # Configuration
-from dotenv import load_dotenv
-load_dotenv(override=True)
-
-api_key = os.environ.get("GEMINI_API_KEY")
-if api_key:
-    genai.configure(api_key=api_key)
-else:
-    print("[LESSON EXTRACTOR] GEMINI API KEY MISSING. Module will not function.", flush=True)
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_NAME = 'gemini-2.5-flash'
 
 def _extractor_worker(trade_id: int):
     """Main analysis logic for a single trade, runs in the background."""
-    if not api_key:
-        return
-        
     try:
         # 1. Fetch trade
         trade = memory.get_trade_by_id(trade_id)
@@ -45,7 +35,7 @@ def _extractor_worker(trade_id: int):
         # Parse context for structured display
         try:
             ctx_data = json.loads(context) if isinstance(context, str) else (context or {})
-        except:
+        except Exception:
             ctx_data = {}
         
         ctx_lines = []
@@ -94,18 +84,18 @@ Respond STRICTLY in JSON format (no markdown blocks), using exactly these keys:
 """
 
         # 3. Call model
-        model = genai.GenerativeModel(MODEL_NAME)
-        response = model.generate_content(
+        response_text = ai_gateway.generate_content(
             prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.2, # Low temp for logical consistency
-                response_mime_type="application/json"
-            )
+            model=MODEL_NAME,
+            response_mime='application/json'
         )
         
+        if not response_text:
+            print("[LESSON EXTRACTOR] No response from AI Gateway.", flush=True)
+            return
+
         # 4. Parse response
-        raw_text = response.text.strip()
-        result = json.loads(raw_text)
+        result = json.loads(response_text)
         
         rule_if = result.get('rule_if', 'N/A')
         rule_then = result.get('rule_then', 'N/A')
@@ -116,7 +106,7 @@ Respond STRICTLY in JSON format (no markdown blocks), using exactly these keys:
         memory.save_lesson(symbol, rule_if, rule_then, rule_because, trade_id)
 
     except json.JSONDecodeError as je:
-         print(f"[LESSON EXTRACTOR] AI JSON parsing error: {je}\nResponse: {response.text}", flush=True)
+         print(f"[LESSON EXTRACTOR] AI JSON parsing error: {je}", flush=True)
     except Exception as e:
         print(f"[LESSON EXTRACTOR] Critical error: {e}", flush=True)
 
@@ -128,28 +118,21 @@ def trigger_lesson_extraction(trade_id: int):
     if trade_id is None or trade_id < 0:
         return
         
-    thread = threading.Thread(target=_extractor_worker, args=(trade_id,))
-    thread.daemon = True # Does not block bot shutdown
-    thread.start()
-    print(f"[LESSON EXTRACTOR] Learning thread started for Trade ID: {trade_id}", flush=True)
+    t = threading.Thread(target=_extractor_worker, args=(trade_id,))
+    t.start()
+
 
 def compress_lessons_daily(symbol: str) -> str:
     """
-    V23.8: Compresses the accumulated AI lessons into a highly condensed set of rules.
-    Acts as a Reinforcement Learning agent: reviews recent trades, evaluates lessons,
-    keeps the ones that work, and discards contradictory or failing ones.
-    Returns a summary string for the daily report.
+    Called once a day (e.g., from an audit or maintenance script).
+    Compresses all accumulated JSON lessons into a succinct 'Golden Rules' list.
     """
-    if not api_key:
-        return f"[{symbol}] Gemini API missing. Compression skipped."
-
     try:
-        # Load learning data
-        learn_path = 'autonomic_learning.json'
+        learn_path = os.path.join(BASE_DIR, 'autonomic_learning.json')
         if not os.path.exists(learn_path):
             return f"[{symbol}] No learning file found."
             
-        with open(learn_path, 'r') as f:
+        with open(learn_path, 'r', encoding='utf-8') as f:
             learn_data = json.load(f)
             
         key = f'ai_lessons_learned_{symbol}'
@@ -161,8 +144,7 @@ def compress_lessons_daily(symbol: str) -> str:
             return f"[{symbol}] Only {lines_count} lessons. Compression not needed yet."
 
         # Fetch recent performance to inform RL
-        import sqlite3
-        conn = sqlite3.connect('bot_memory.db')
+        conn = sqlite3.connect(memory.DB_PATH)
         cur = conn.cursor()
         cur.execute("SELECT side, pnl, context, close_reason FROM trades WHERE symbol = ? ORDER BY id DESC LIMIT 20", (symbol,))
         recent_trades = cur.fetchall()
@@ -197,18 +179,19 @@ Example Format:
 - STRICTLY AVOID longs during extreme volatility (ATR > X).
 """
 
-        model = genai.GenerativeModel(MODEL_NAME)
-        response = model.generate_content(
+        compressed_text = ai_gateway.generate_content(
             prompt,
-            generation_config=genai.types.GenerationConfig(temperature=0.1)
+            model=MODEL_NAME
         )
-        
-        compressed_text = response.text.strip().replace("```text", "").replace("```", "").strip()
+        if not compressed_text:
+            return f"[{symbol}] Compression failed via AI Gateway."
+            
+        compressed_text = compressed_text.strip().replace("```text", "").replace("```", "").strip()
         new_lines_count = len(compressed_text.split('\n'))
         
         # Overwrite with compressed lessons
         learn_data[key] = compressed_text
-        with open(learn_path, 'w') as f:
+        with open(learn_path, 'w', encoding='utf-8') as f:
             json.dump(learn_data, f, indent=4)
             
         summary_msg = f"[{symbol}] Compressed {lines_count} lines of lessons into {new_lines_count} Golden Rules."
@@ -219,4 +202,3 @@ Example Format:
         err_msg = f"[{symbol}] Compression error: {e}"
         print(f"[LESSON COMPRESSION] {err_msg}", flush=True)
         return err_msg
-

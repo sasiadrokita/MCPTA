@@ -7,7 +7,6 @@ __pycache__/
 venv/
 env/
 ENV/
-.env
 
 # API Keys and Credentials
 .env
@@ -24,13 +23,23 @@ redis/
 
 # Application state and logs
 autonomic_learning.json
+autonomic_learning.json.bak
+nexus_state.json
 macro_intel.json
 tg_signals.json
 video_intel.json
+video_intel_dash.json
 video_last_id.txt
+circuit_breaker_state.json
 engine.log
 *.log
 
 # Temp directories
 /tmp/
 scratch/
+
+# Debug/audit scripts (created during debugging sessions)
+audit.py
+tuesday_audit.py
+weekend_audit.py
+interrogate_bot.py

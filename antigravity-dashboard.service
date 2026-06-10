@@ -5,10 +5,10 @@ After=network.target
 [Service]
 Type=simple
 User=mateusz
-WorkingDirectory=/home/mateusz/Documents/Workspace/MCPTA
-Environment="PATH=/home/mateusz/Documents/Workspace/MCPTA/venv/bin:/usr/bin:/bin"
-EnvironmentFile=/home/mateusz/Documents/Workspace/MCPTA/.env
-ExecStart=/home/mateusz/Documents/Workspace/MCPTA/venv/bin/python /home/mateusz/Documents/Workspace/MCPTA/dashboard.py
+WorkingDirectory=/home/mateusz/MCPTA
+Environment="PATH=/home/mateusz/MCPTA/venv/bin:/usr/bin:/bin"
+EnvironmentFile=/home/mateusz/MCPTA/.env
+ExecStart=/home/mateusz/MCPTA/venv/bin/python /home/mateusz/MCPTA/dashboard.py
 StandardOutput=append:/tmp/dashboard.log
 StandardError=append:/tmp/dashboard.log
 Restart=always

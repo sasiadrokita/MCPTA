@@ -9,10 +9,9 @@ Open: http://localhost:5000
 import os
 import json
 import subprocess
-import sys
-import re
-import version
 import time
+import version
+from datetime import datetime, timezone
 from flask import Flask, render_template, jsonify, request
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -247,7 +246,7 @@ def get_recent_trades(n=15):
     """v23.8: Fetches recent closed trades from Bybit V5 with full date+time."""
     try:
         res = bybit.exchange.private_get_v5_position_closed_pnl({'category': 'linear', 'limit': n})
-        if res.get('retCode') == '0':
+        if str(res.get('retCode')) == '0':
             trades_list = res.get('result', {}).get('list', [])
             trades = []
             for t in trades_list:
@@ -278,11 +277,11 @@ def get_recent_trades(n=15):
 def get_pnl_summary():
     """Calculates realized Daily and Monthly PnL from Bybit closed positions."""
     try:
-        import datetime
-        now = datetime.datetime.utcnow()
+        import datetime as dt
+        now = datetime.now(timezone.utc)
         # Fetch last 200 closed trades for monthly coverage
         res = bybit.exchange.private_get_v5_position_closed_pnl({'category': 'linear', 'limit': 200})
-        if res.get('retCode') != '0':
+        if str(res.get('retCode')) != '0':
             return {'daily': 0.0, 'monthly': 0.0}
 
         trades_list = res.get('result', {}).get('list', [])
@@ -294,7 +293,7 @@ def get_pnl_summary():
 
         for t in trades_list:
             ts = int(t.get('updatedTime', 0)) / 1000
-            trade_dt = datetime.datetime.utcfromtimestamp(ts)
+            trade_dt = datetime.fromtimestamp(ts, tz=timezone.utc)
             pnl = float(t.get('closedPnl', 0))
 
             if trade_dt.date() == today:
@@ -360,6 +359,13 @@ def api_status():
 
 @app.route('/api/bot-action', methods=['POST'])
 def api_bot_action():
+    # Simple token auth from environment
+    auth_token = os.environ.get('DASHBOARD_AUTH_TOKEN', '')
+    if auth_token:
+        req_token = request.headers.get('X-Auth-Token', '')
+        if req_token != auth_token:
+            return jsonify({'status': 'unauthorized'}), 401
+
     data = request.get_json(silent=True) or {}
     action = data.get('action', '')
 
