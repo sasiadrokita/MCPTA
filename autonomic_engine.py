@@ -2375,8 +2375,11 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                     # V24.0: Set Native Bybit Trailing Stop (Trailing distance = 4.0 ATR)
                     trailing_distance = round(atr * 4.0, price_precision)
                     # Activate it ONLY after hitting the AI's designated Take Profit level?
-                    # V24.6.1 FIX: Activate it IMMEDIATELY so it trails from entry.
-                    active_prc = None
+                    # V24.6.2 FIX: Activate it after 2.0 ATR in profit to prevent early choking.
+                    if signal_dir == 'LONG':
+                        active_prc = round(current_price + (atr * 2.0), price_precision)
+                    else:
+                        active_prc = round(current_price - (atr * 2.0), price_precision)
                     bybit.set_trailing_stop(symbol, trailing_dist=trailing_distance, active_price=active_prc)
                     print(f"[{symbol}] V24.0 TRAILING STOP PREPARED: Dist={trailing_distance}, Activates at TP={active_prc}", flush=True)
 
