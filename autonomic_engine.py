@@ -2127,11 +2127,11 @@ ACTIVE POSITION ON {symbol}:
 
 ═══════════════════════════════════════════════════════
 RISK MANAGEMENT — HARD RULES:
-- ⚠️ SL MUST be at least {atr * 2.0:.4f} (2.0 ATR) away from entry. NEVER place SL closer than this. Tight SLs result in premature exits on noise/wicks. If your structural level is tighter than 2.0 ATR, DO NOT take the trade.
+- ⚠️ SL MUST be at least {atr * 4.0:.4f} (4.0 ATR) away from entry. NEVER place SL closer than this. Tight SLs result in premature exits on noise/wicks. If your structural level is tighter than 4.0 ATR, DO NOT take the trade.
 - TP MUST give a Risk:Reward ratio of at least 2.0. If R:R < 2.0, DO NOT take the trade.
 - {rm_guideline}
-- Recommended SL placement: behind the most recent swing low/high or SFP wick, typically 1.5–2.5x ATR from entry.
-- Recommended TP placement: at the next structural resistance/support, typically 2.0–4.0x ATR from entry.
+- Recommended SL placement: behind the most recent swing low/high or SFP wick, typically 4.0–8.0x ATR from entry.
+- Recommended TP placement: at the next structural resistance/support, typically 8.0–16.0x ATR from entry.
 - `scale`: 0.3-0.5 for uncertain setups, 0.7-1.0 for high confluence.
 - Leverage: 3-5x default, 7x MAXIMUM only for SFP-confirmed high-conviction setups. (Note: System will dynamically scale this down based on risk factors).
 - HOLD is a valid and often optimal action — do NOT force trades in ambiguous conditions.
