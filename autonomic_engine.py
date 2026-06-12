@@ -2380,6 +2380,14 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                         active_prc = round(current_price + (atr * 2.0), price_precision)
                     else:
                         active_prc = round(current_price - (atr * 2.0), price_precision)
+                    
+                    # [V24.6.3 FIX] Bybit V5 API Race Condition:
+                    # If we set Trailing Stop immediately, Bybit's backend may not yet see the open position.
+                    # If position size is 0 internally, Bybit silently IGNORES the 'activePrice' parameter
+                    # and activates the Trailing Stop immediately at the current market price, causing premature exits.
+                    print(f"[{symbol}] Waiting 2.0s for Bybit backend to sync position before setting Trailing Stop...", flush=True)
+                    time.sleep(2.0)
+                    
                     bybit.set_trailing_stop(symbol, trailing_dist=trailing_distance, active_price=active_prc)
                     print(f"[{symbol}] V24.0 TRAILING STOP PREPARED: Dist={trailing_distance}, Activates at TP={active_prc}", flush=True)
 
