@@ -2110,7 +2110,7 @@ TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
 - Macro EMA (200): {ema_macro:.4f}
 - Status: {ema_cross_status}
 
-* COUNTER-TREND SCALPING: You are PERMITTED to open a counter-trend MEAN-REVERSION trade ONLY IF the market is severely OVEREXTENDED AND you have ABSOLUTE CERTAINTY from multiple aligning indicators (e.g., SFP + strong Divergence + positive CVD/Orderflow all screaming reversal). If there is any doubt or conflicting signals, DO NOT override your Golden Rules. DO NOT set a hard Take Profit at the 15m EMA. Instead, set a very wide initial TP (8.0-16.0 ATR) and rely on the automated Trailing Stop. Be aware: the Trailing Stop activates automatically at +2.0 ATR profit and trails at a distance of 4.0 ATR.
+* COUNTER-TREND SCALPING: You are PERMITTED to open a counter-trend MEAN-REVERSION trade ONLY IF the market is severely OVEREXTENDED AND you have ABSOLUTE CERTAINTY from multiple aligning indicators (e.g., SFP + strong Divergence + positive CVD/Orderflow all screaming reversal). If there is any doubt or conflicting signals, DO NOT override your Golden Rules. DO NOT set a hard Take Profit at the 15m EMA. Instead, set a very wide initial TP (8.0-16.0 ATR) and rely on the automated Trailing Stop. Be aware: the Trailing Stop activates automatically ONLY when the price reaches your Take Profit (TP), and then trails at a distance of 4.0 ATR. Until then, rely on your SL.
 * REVERSAL CONFIRMATION: If executing a pullback strategy, verify if CVD (Orderflow) confirms the rejection (e.g. positive CVD on bottom).
 
 NEXUS INTELLIGENCE:
@@ -2135,6 +2135,7 @@ RISK MANAGEMENT — HARD RULES:
 - `scale`: 0.3-0.5 for uncertain setups, 0.7-1.0 for high confluence.
 - Leverage: 3x default, 5x MAXIMUM only for SFP-confirmed high-conviction setups. (Note: System will dynamically scale this down based on risk factors and hard-cap at 5x).
 - HOLD is a valid and often optimal action — do NOT force trades in ambiguous conditions.
+- EARLY EXIT (action: EXIT): You have the right to close an open position early ONLY in case of extremely critical and unambiguous reversal signals. Try to use this as rarely as possible. Frequent early exits indicate 'weak hands' and typically turn potential profits into losses. Rely on your SL and TP.
 
 Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": float, "scale": 0.1-1.0, "leverage": int, "wave_analysis": "short_desc", "reason": "string"}}
 """
@@ -2225,25 +2226,7 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
             elif ai_action == "EXIT" and is_revaluation:
                 # Early Exit implementation
                 trade = GLOBAL_STATE['open_trades'][symbol]
-                pnl_pct = ((current_price - trade['entry_price']) / trade['entry_price'] * 100) if trade['side'] == 'BUY' else ((trade['entry_price'] - current_price) / trade['entry_price'] * 100)
-                if not is_test_mission and pnl_pct > 0 and pnl_pct < 1.0:
-                     print(f"[{symbol}] EXIT BLOCKED: AI attempted to cut winners early ({pnl_pct:.2f}%). Forcing HOLD.", flush=True)
-                     return
-                trade_age = time.time() - trade.get("entry_time", time.time())
-                
-                # V24.0 Smart Early Exit bypass
-                is_deep_underwater = False
-                sl_prc = float(trade.get('current_sl', 0))
-                entry_prc = float(trade['entry_price'])
-                if sl_prc > 0 and entry_prc > 0:
-                    if trade['side'] == 'BUY' and current_price < entry_prc:
-                        is_deep_underwater = (entry_prc - current_price) / (entry_prc - sl_prc) > 0.5
-                    elif trade['side'] == 'SELL' and current_price > entry_prc:
-                        is_deep_underwater = (current_price - entry_prc) / (sl_prc - entry_prc) > 0.5
-                
-                if not is_test_mission and trade_age < 1800 and not is_deep_underwater:
-                    print(f"[{symbol}] EARLY EXIT BLOCKED: Position too young ({trade_age/60:.1f} min) and not deep underwater.", flush=True)
-                    return
+                # Early Exit is completely dictated by AI judgment. Mathematical blocks removed to avoid trapping positions.
                 print(f"[{symbol}] AI DICTATOR ORDERS EARLY EXIT: {ai_reason}")
                 exit_side = 'SELL' if trade['side'] == 'BUY' else 'BUY'
                 cancel_all_orders(symbol)
@@ -2374,12 +2357,8 @@ Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": 
                     
                     # V24.0: Set Native Bybit Trailing Stop (Trailing distance = 4.0 ATR)
                     trailing_distance = round(atr * 4.0, price_precision)
-                    # Activate it ONLY after hitting the AI's designated Take Profit level?
-                    # V24.6.2 FIX: Activate it after 2.0 ATR in profit to prevent early choking.
-                    if signal_dir == 'LONG':
-                        active_prc = round(current_price + (atr * 2.0), price_precision)
-                    else:
-                        active_prc = round(current_price - (atr * 2.0), price_precision)
+                    # Activate Trailing Stop exactly at the AI's Take Profit level
+                    active_prc = round(tp_price, price_precision)
                     
                     # [V24.6.3 FIX] Bybit V5 API Race Condition:
                     # If we set Trailing Stop immediately, Bybit's backend may not yet see the open position.
