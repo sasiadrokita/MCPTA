@@ -2110,7 +2110,7 @@ TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
 - Macro EMA (200): {ema_macro:.4f}
 - Status: {ema_cross_status}
 
-* COUNTER-TREND SCALPING: You are PERMITTED to open a counter-trend MEAN-REVERSION trade ONLY IF the market is severely OVEREXTENDED AND you have ABSOLUTE CERTAINTY from multiple aligning indicators (e.g., SFP + strong Divergence + positive CVD/Orderflow all screaming reversal). If there is any doubt or conflicting signals, DO NOT override your Golden Rules. DO NOT set a hard Take Profit at the 15m EMA. Instead, set a very wide initial TP and rely on the Trailing Stop to secure profits once the price crosses the 15m Medium EMA, letting the winner run if a new trend starts.
+* COUNTER-TREND SCALPING: You are PERMITTED to open a counter-trend MEAN-REVERSION trade ONLY IF the market is severely OVEREXTENDED AND you have ABSOLUTE CERTAINTY from multiple aligning indicators (e.g., SFP + strong Divergence + positive CVD/Orderflow all screaming reversal). If there is any doubt or conflicting signals, DO NOT override your Golden Rules. DO NOT set a hard Take Profit at the 15m EMA. Instead, set a very wide initial TP (8.0-16.0 ATR) and rely on the automated Trailing Stop. Be aware: the Trailing Stop activates automatically at +2.0 ATR profit and trails at a distance of 4.0 ATR.
 * REVERSAL CONFIRMATION: If executing a pullback strategy, verify if CVD (Orderflow) confirms the rejection (e.g. positive CVD on bottom).
 
 NEXUS INTELLIGENCE:
@@ -2133,7 +2133,7 @@ RISK MANAGEMENT — HARD RULES:
 - Recommended SL placement: behind the most recent swing low/high or SFP wick, typically 4.0–8.0x ATR from entry.
 - Recommended TP placement: at the next structural resistance/support, typically 8.0–16.0x ATR from entry.
 - `scale`: 0.3-0.5 for uncertain setups, 0.7-1.0 for high confluence.
-- Leverage: 3-5x default, 7x MAXIMUM only for SFP-confirmed high-conviction setups. (Note: System will dynamically scale this down based on risk factors).
+- Leverage: 3x default, 5x MAXIMUM only for SFP-confirmed high-conviction setups. (Note: System will dynamically scale this down based on risk factors and hard-cap at 5x).
 - HOLD is a valid and often optimal action — do NOT force trades in ambiguous conditions.
 
 Output JSON: {{"action": "LONG/SHORT/HOLD/EXIT", "sl_price": float, "tp_price": float, "scale": 0.1-1.0, "leverage": int, "wave_analysis": "short_desc", "reason": "string"}}
