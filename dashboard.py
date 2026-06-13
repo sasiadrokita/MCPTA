@@ -525,9 +525,17 @@ def api_chart_markers():
                 tp_val = float(p.get('tps', [0])[0] if p.get('tps') else 0)
                 if tp_val == 0:
                     for db_trade in db_trades:
-                        if db_trade['symbol'] == p['symbol_raw'] and float(db_trade.get('tp', 0)) > 0:
-                            tp_val = float(db_trade['tp'])
-                            break
+                        if db_trade['symbol'] == p['symbol_raw']:
+                            ctx_str = db_trade.get('context')
+                            if ctx_str:
+                                import json
+                                try:
+                                    ctx = json.loads(ctx_str)
+                                    if float(ctx.get('tp', 0)) > 0:
+                                        tp_val = float(ctx['tp'])
+                                        break
+                                except Exception:
+                                    pass
                             
                 if tp_val > 0:
                     lines.append({
