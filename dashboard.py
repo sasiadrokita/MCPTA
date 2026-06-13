@@ -11,6 +11,7 @@ import json
 import subprocess
 import time
 import version
+import bot_memory
 from datetime import datetime, timezone
 from flask import Flask, render_template, jsonify, request
 
@@ -489,6 +490,12 @@ def api_chart_markers():
 
         # 2. Active Positions (Current)
         positions = get_positions()
+        try:
+            db_trades = bot_memory.get_open_trades_from_db()
+        except Exception:
+            db_trades = []
+            
+        lines = []
         for p in positions:
             if p['symbol_raw'] == symbol or p['symbol'] == symbol or p['symbol'].startswith(symbol.replace('USDT','')):
                 # CCXT unified or Bybit raw returns createdTime in ms or entry time
@@ -505,12 +512,36 @@ def api_chart_markers():
                     'shape': 'arrowUp' if side_str == 'LONG' else 'arrowDown'
                 })
                 
+                # Add SL line
+                sl_val = float(p.get('sl', 0))
+                if sl_val > 0:
+                    lines.append({
+                        'price': sl_val,
+                        'color': '#ef4444', # red
+                        'title': 'SL'
+                    })
+                    
+                # Add TP line
+                tp_val = float(p.get('tps', [0])[0] if p.get('tps') else 0)
+                if tp_val == 0:
+                    for db_trade in db_trades:
+                        if db_trade['symbol'] == p['symbol_raw'] and float(db_trade.get('tp', 0)) > 0:
+                            tp_val = float(db_trade['tp'])
+                            break
+                            
+                if tp_val > 0:
+                    lines.append({
+                        'price': tp_val,
+                        'color': '#10b981', # green
+                        'title': 'TP'
+                    })
+                
         # Sort markers by time
         markers.sort(key=lambda x: x['time'])
-        return jsonify(markers)
+        return jsonify({'markers': markers, 'lines': lines})
     except Exception as e:
         print(f"[DASH] Marker Error: {e}")
-        return jsonify([])
+        return jsonify({'markers': [], 'lines': []})
 
 if __name__ == '__main__':
     port = int(os.environ.get('DASHBOARD_PORT', 5000))

@@ -1106,12 +1106,35 @@
                 .catch(err => console.error("Chart fetch error:", err));
         }
 
+        let activePriceLines = [];
+
         function fetchChartMarkers() {
             fetch(`/api/chart_markers?symbol=${currentChartSymbol}&timeframe=${currentChartTimeframe}`)
                 .then(r => r.json())
-                .then(markers => {
-                    if (markers && Array.isArray(markers)) {
-                        candleSeries.setMarkers(markers);
+                .then(res => {
+                    if (res && res.markers && Array.isArray(res.markers)) {
+                        candleSeries.setMarkers(res.markers);
+                    } else if (Array.isArray(res)) {
+                        candleSeries.setMarkers(res); // backward compatibility
+                    }
+                    
+                    if (res && res.lines && Array.isArray(res.lines)) {
+                        // Clear old lines
+                        activePriceLines.forEach(line => candleSeries.removePriceLine(line));
+                        activePriceLines = [];
+                        
+                        // Add new lines
+                        res.lines.forEach(l => {
+                            const line = candleSeries.createPriceLine({
+                                price: l.price,
+                                color: l.color,
+                                lineWidth: 2,
+                                lineStyle: LightweightCharts.LineStyle.Dashed,
+                                axisLabelVisible: true,
+                                title: l.title
+                            });
+                            activePriceLines.push(line);
+                        });
                     }
                 })
                 .catch(err => console.error("Marker fetch error:", err));
