@@ -11,7 +11,7 @@ import json
 import subprocess
 import time
 import version
-import bot_memory
+import memory as bot_memory
 from datetime import datetime, timezone
 from flask import Flask, render_template, jsonify, request
 
