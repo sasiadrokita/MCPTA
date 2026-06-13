@@ -811,7 +811,7 @@
           <div class="pos-row"><span class="pos-label">Entry</span><span>${parseFloat(p.entry_price).toFixed(2)}</span></div>
           <div class="pos-row"><span class="pos-label">Mark</span><span>${parseFloat(p.mark_price).toFixed(2)}</span></div>
           <div class="pos-row"><span class="pos-label">SL</span><span class="pos-pnl red" style="font-weight:600">${p.sl ? parseFloat(p.sl).toFixed(2) : '--'}</span></div>
-          <div class="pos-row"><span class="pos-label">TPs</span><span style="color:var(--accent2); font-weight:600">${p.tps && p.tps.length > 0 ? p.tps.map(tp => parseFloat(tp).toFixed(2)).join(' | ') : '--'}</span></div>
+          <div class="pos-row"><span class="pos-label">TPs</span><span style="color:var(--accent2); font-weight:600">${p.tps && p.tps.length > 0 ? p.tps.map(tp => parseFloat(tp).toFixed(2)).join(' | ') : (p.ts_dist > 0 ? 'Dynamic TS (' + p.ts_dist + ')' : '--')}</span></div>
           <div class="pos-row"><span class="pos-label">Qty</span><span>${Math.abs(p.qty)}</span></div>
           <div class="pos-row"><span class="pos-label">PnL</span><span class="pos-pnl ${pnl >= 0 ? 'green' : 'red'}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USDT</span></div>
           <div class="pos-row"><span class="pos-label">Lev</span><span>${p.leverage}x</span></div>

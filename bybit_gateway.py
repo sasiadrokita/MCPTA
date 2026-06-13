@@ -93,6 +93,7 @@ class BybitGateway:
                     raw = p.get('info', {})
                     sl_val = float(raw.get('stopLoss', 0) or 0)
                     tp_val = float(raw.get('takeProfit', 0) or 0)
+                    ts_val = float(raw.get('trailingStop', 0) or 0)
                     
                     # createdTime is in ms, default to current time if missing
                     created_time_ms = float(raw.get('createdTime', p.get('timestamp') or (time.time() * 1000)))
@@ -112,6 +113,7 @@ class BybitGateway:
                         'liquidation_price': float(p.get('liquidationPrice', 0) or 0),
                         'sl': sl_val,
                         'tps': [tp_val] if tp_val > 0 else [],
+                        'ts_dist': ts_val,
                         'entry_time': created_time_ms / 1000.0  # Convert to seconds
                     })
             return active
