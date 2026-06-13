@@ -524,7 +524,8 @@ def api_chart_markers():
                 # Add TP line
                 tp_val = float(p.get('tps', [0])[0] if p.get('tps') else 0)
                 if tp_val == 0:
-                    for db_trade in db_trades:
+                    # Reverse db_trades to get the most recent open trade first
+                    for db_trade in reversed(db_trades):
                         if db_trade['symbol'] == p['symbol_raw']:
                             ctx_str = db_trade.get('context')
                             if ctx_str:
