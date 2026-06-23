@@ -269,11 +269,13 @@ class BybitGateway:
 
             cvd = 0.0
             try:
-                trades = self.exchange.fetch_trades(linear_sym, limit=500)
-                if trades:
-                    buy_vol = sum(t.get('amount', 0) for t in trades if t.get('side') == 'buy')
-                    sell_vol = sum(t.get('amount', 0) for t in trades if t.get('side') == 'sell')
-                    cvd = buy_vol - sell_vol
+                klines_5m = self.exchange.fetch_ohlcv(linear_sym, '5m', limit=10)
+                if klines_5m:
+                    _cvd_val = 0.0
+                    for k in klines_5m[-5:]: # last 25 mins
+                        _o, _c, _vol = float(k[1]), float(k[4]), float(k[5])
+                        _cvd_val += _vol if _c >= _o else -_vol
+                    cvd = round(_cvd_val, 2)
             except Exception as e:
                 print(f"[BYBIT] CVD fetch error for {symbol}: {e}")
 
