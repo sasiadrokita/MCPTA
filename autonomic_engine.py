@@ -2051,6 +2051,7 @@ You MUST return "action": "HOLD" and abort the trade if ANY of the following are
 2. LESSON OVERRIDE: If any CONDITIONAL LESSON (★ REGIME MATCH) says "AVOID LONG" and you consider LONG -> RETURN HOLD. Same for SHORT.
 3. ORDER BOOK / CVD CONTRADICTION: If considering LONG but Order Book Imbalance is 'ASKS', or considering SHORT but 'BIDS' -> RETURN HOLD.
 4. NO CHASING (OVEREXTENSION): If considering LONG but price is OVEREXTENDED UPWARDS, or considering SHORT but OVEREXTENDED DOWNWARDS -> RETURN HOLD. Do not buy the top or short the bottom!
+5. CHOPPY PULLBACK BAN: Do NOT enter trades based purely on a "pullback to 15m EMA" unless ADX > 30 and the 1H timeframe strongly confirms. In choppy summer markets, these setups frequently result in whipsaws. AVOID standard "wait for pullback to EMA" logic unless trend is exceptionally strong.
 
 You have access to the following intelligence sources — use ALL of them:
   1. ELLIOTT WAVE: structural market geometry, wave position, expected next move

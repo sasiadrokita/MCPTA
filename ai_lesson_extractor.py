@@ -69,17 +69,18 @@ Exit: {exit_price} ({close_ts})
 *** CRITICAL TASK ***
 Analyze WHY this trade succeeded or failed given the SPECIFIC market conditions at entry.
 
-KEY INSIGHT: A rule that applies in one market constellation may NOT apply in another.
-- Example of WRONG lesson: "Never open SHORT when RSI is oversold."
-- Example of CORRECT lesson: "Never open SHORT when RSI is oversold (<30) AND Nexus Score > 6.0 (BULLISH) AND ADX < 20 (weak trend). In that specific combination, the bounce risk is too high."
+KEY INSIGHT: Overfitted rules with too many conditions NEVER trigger again. 
+- Example of WRONG lesson (overfitted): "IF RSI < 30 AND ADX < 20 AND Regime is RANGE_BOUND AND CVD > 1000 THEN..."
+- Example of CORRECT lesson (generalized): "IF Regime is RANGE_BOUND AND ADX < 20 THEN AVOID shorting breakouts. The lack of trend guarantees a whip-saw."
 
-Generate one concise, iron-clad CONDITIONAL rule that captures the relationship between market conditions and outcome.
+Generate one concise, iron-clad CONDITIONAL rule.
+LIMIT the IF condition to ONE or maximum TWO variables (e.g., just Regime + one indicator). NEVER chain more than two conditions!
 
 Respond STRICTLY in JSON format (no markdown blocks), using exactly these keys:
 {{
-    "rule_if": "A very specific combination of market conditions from the entry context (regime, RSI, ADX, nexus bias, SFP, wave, portfolio state) that characterizes THIS specific setup. Be precise about thresholds.",
-    "rule_then": "Operational directive: what the bot SHOULD or SHOULD NOT do in that specific constellation. E.g., 'AVOID opening SHORT', or 'PRIORITIZE LONG with scale >= 0.7'.",
-    "rule_because": "Short, precise causal explanation based on this specific trade outcome. Explain the market mechanism that caused the profit or loss."
+    "rule_if": "A concise condition using MAX TWO variables from the context. Be precise about thresholds.",
+    "rule_then": "Operational directive: what the bot SHOULD or SHOULD NOT do in that specific constellation.",
+    "rule_because": "Short, precise causal explanation based on this specific trade outcome."
 }}
 """
 
