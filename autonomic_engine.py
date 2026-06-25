@@ -72,8 +72,8 @@ ctx = ssl.create_default_context()
 
 SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT"] # [v22.0.0] Altcoin Spring
 LEARNING_FILE = 'autonomic_learning.json'
-INTERVAL = '15m' # or 1h, 4h
-MACRO_INTERVAL = '4h' # Added to verify broader trend
+INTERVAL = '1d' # Macro Timeframe (Daily)
+MACRO_INTERVAL = '1w' # Broader macro trend (Weekly)
 RISK_PERCENT = 0.01  # Restored to 0.01 (too frequent stop-losses with aggressive SL)
 
 NEXUS_STATE_FILE = 'nexus_state.json'
@@ -1543,7 +1543,6 @@ def get_dynamic_leverage(symbol, nexus_score, fgi_score, adx, suggested_leverage
     Adjusts suggested leverage based on Nexus Score, Fear & Greed, and Market Regime.
     """
     # 1. Base filter: Nexus Score
-    # Score < 5.0 reduces leverage proportionally
     nexus_multiplier = min(1.0, nexus_score / 7.0) 
     
     # 2. Risk filter: Extreme FGI
@@ -1552,9 +1551,9 @@ def get_dynamic_leverage(symbol, nexus_score, fgi_score, adx, suggested_leverage
         fgi_multiplier = 0.5 # Half leverage in extreme panic/euphoria
 
     # 3. Regime filter: ADX
-    regime_cap = 20
+    regime_cap = 2 # MACRO PIVOT: Max leverage is 2x for long-term daily candles
     if adx < 20: # RANGING/CHOP
-        regime_cap = 5 # Strict cap for ranging markets
+        regime_cap = 1 # Strict cap 1x for ranging markets
     
     final_leverage = int(round(suggested_leverage * nexus_multiplier * fgi_multiplier))
     final_leverage = max(1, min(final_leverage, regime_cap))
@@ -1732,20 +1731,15 @@ def evaluate_market_condition(symbol, current_price):
             last_ai_price = GLOBAL_STATE['last_ai_price'].get(symbol, current_price)
             last_ai_time = GLOBAL_STATE['last_ai_call'].get(symbol, 0)
             
-            # 1. Heartbeat Trigger (4 hours = 14400 seconds)
-            if now - last_ai_time > 14400:
+            # 1. Macro Heartbeat Trigger (24 hours = 86400 seconds)
+            if now - last_ai_time > 86400:
                 should_wake = True
-                wake_reason = "Heartbeat (4h)"
+                wake_reason = "Macro Heartbeat (24h)"
                 
-            # 2. Indicator Trigger (Extreme RSI)
-            elif rsi < 30 or rsi > 70:
+            # 2. Macro Volatility Spike (> 1.5 ATR since last eval)
+            elif abs(current_price - last_ai_price) > (1.5 * atr):
                 should_wake = True
-                wake_reason = f"Extreme RSI ({rsi:.1f})"
-                
-            # 3. Volatility/Price Movement Spike (> 0.5 ATR since last eval)
-            elif abs(current_price - last_ai_price) > (0.5 * atr):
-                should_wake = True
-                wake_reason = f"Volatility Spike (>0.5 ATR)"
+                wake_reason = f"Macro Volatility Spike (>1.5 ATR)"
                 
             # 4. Intent Tracking (Proximity to EMA)
             else:
@@ -2038,30 +2032,26 @@ def evaluate_market_condition(symbol, current_price):
 ║  PRIME DIRECTIVE: MAKE MONEY. PROTECT CAPITAL.      ║
 ╚══════════════════════════════════════════════════════╝
 
-Your SOLE purpose is to generate consistent, compounding profit on the Bybit exchange.
-Every decision you make must be evaluated through one lens: "Will this increase the account balance?"
+Your SOLE purpose is to generate long-term, compounding profit on the Bybit exchange as a Macro Fund Manager.
+You evaluate the market on Daily (1D) and Weekly (1W) timeframes. You MUST ignore short-term noise and scalp signals.
+Every decision you make must be evaluated through one lens: "Does the geopolitical and macro on-chain data support a multi-day position?"
 - A HOLD when conditions are unclear IS profit (preserved capital).
-- A bad trade IS a loss, even if the reasoning seemed logical.
 - You have learned from {len(bot_memory.get_recent_lessons(symbol, limit=100) if BOT_MEMORY_OK else [])} past trades on {symbol}. USE that knowledge.
 
 ═══════════════════════════════════════════════════════
 CRITICAL HARD FILTERS (KILL-SWITCHES) — NON-NEGOTIABLE:
 You MUST return "action": "HOLD" and abort the trade if ANY of the following are true:
-1. CHOP / WEAK TREND: If Regime is 'VOLATILE_CHOP' OR ('RANGE_BOUND' and ADX < 20) -> RETURN HOLD.
-2. LESSON OVERRIDE: If any CONDITIONAL LESSON (★ REGIME MATCH) says "AVOID LONG" and you consider LONG -> RETURN HOLD. Same for SHORT.
-3. ORDER BOOK / CVD CONTRADICTION: If considering LONG but Order Book Imbalance is 'ASKS', or considering SHORT but 'BIDS' -> RETURN HOLD.
-4. NO CHASING (OVEREXTENSION): If considering LONG but price is OVEREXTENDED UPWARDS, or considering SHORT but OVEREXTENDED DOWNWARDS -> RETURN HOLD. Do not buy the top or short the bottom!
-5. CHOPPY PULLBACK BAN: Do NOT enter trades based purely on a "pullback to 15m EMA" unless ADX > 30 and the 1H timeframe strongly confirms. In choppy summer markets, these setups frequently result in whipsaws. AVOID standard "wait for pullback to EMA" logic unless trend is exceptionally strong.
+1. WEAK MACRO TREND: If Daily ADX < 20 -> RETURN HOLD. Do not trade in ranging macro markets.
+2. LESSON OVERRIDE: If any CONDITIONAL LESSON says "AVOID LONG" and you consider LONG -> RETURN HOLD. Same for SHORT.
+3. NO CHASING: If considering LONG but price is OVEREXTENDED UPWARDS on the Daily chart, or considering SHORT but OVEREXTENDED DOWNWARDS -> RETURN HOLD. Do not buy the macro top or short the macro bottom!
 
-You have access to the following intelligence sources — use ALL of them:
-  1. ELLIOTT WAVE: structural market geometry, wave position, expected next move
-  2. MARKET REGIME + ADX: is there a real trend? (ADX < 20 = chop, avoid new entries)
-  3. RSI: momentum state, divergences, extreme levels
-  4. SFP (Swing Failure Pattern): liquidity sweeps — high-probability reversal signals
-  5. BTC/ETH SYMMETRY: cross-asset confirmation — divergence is a warning sign
-  6. NEXUS AI SCORE: macro sentiment from news, video analysis, Fear&Greed
-  7. CONDITIONAL LESSONS: your own learned patterns from closed trades
-  8. ORDERFLOW (CVD/Funding): pure buying/selling pressure metrics
+You have access to the following intelligence sources — PRIORITY IS TOP TO BOTTOM:
+  1. NEXUS AI SCORE & GEOPOLITICS: macro sentiment from news, video analysis, Fear&Greed (MOST IMPORTANT)
+  2. ORDERFLOW (CVD/Funding): pure macro buying/selling pressure metrics
+  3. BTC/ETH SYMMETRY: cross-asset confirmation — divergence is a warning sign
+  4. DAILY/WEEKLY MARKET REGIME + ADX: is there a real macro trend?
+  5. ELLIOTT WAVE (Macro): structural market geometry on Daily/Weekly
+  6. CONDITIONAL LESSONS: your own learned patterns from closed trades
 
 ═══════════════════════════════════════════════════════
 PORTFOLIO STATE:
@@ -2071,39 +2061,34 @@ PORTFOLIO STATE:
 ═══════════════════════════════════════════════════════
 INSTRUMENT: {symbol}
 
-MARKET STRUCTURE & MOMENTUM (15m):
-- Wave Context (Macro): {macro_context}
-- Local Structure: {structure_desc}
+MACRO STRUCTURE & MOMENTUM (1D):
+- Wave Context (Weekly): {macro_context}
+- Local Structure (Daily): {structure_desc}
 - MACD Momentum: {macd_data['hist_slope']} (MACD: {macd_data['macd']:.4f}, Signal: {macd_data['signal']:.4f})
 - Divergence: {divergence_signal}
 
-QUANTITATIVE METRICS:
-- Regime: {market_regime} | ADX: {adx:.2f} {"⚠️ WEAK TREND - be cautious with new entries" if adx < 20 else "✅ TREND CONFIRMED"}
-- SFP Signal: {sfp_signal if sfp_signal else 'None'} {"← HIGH CONVICTION reversal signal" if sfp_signal else ""}
+QUANTITATIVE MACRO METRICS:
+- Regime: {market_regime} | ADX: {adx:.2f} {"⚠️ WEAK MACRO TREND - avoid entries" if adx < 20 else "✅ TREND CONFIRMED"}
+- SFP Signal: {sfp_signal if sfp_signal else 'None'}
 - BTC/ETH Sync: {symmetry_desc}
 - Order Book Imbalance: {order_book_impact}
-- Orderflow Data: CVD (last 500 trades) = {cvd:.2f} ({"Bullish" if cvd > 0 else "Bearish"}), Funding Rate = {funding_rate:.6f}
+- Orderflow Data: CVD (last 25 candles) = {cvd:.2f} ({"Bullish" if cvd > 0 else "Bearish"}), Funding Rate = {funding_rate:.6f}
 
-TECHNICAL ANALYSIS — MULTI-TIMEFRAME:
+TECHNICAL ANALYSIS — MACRO TIMEFRAMES:
 
 {fib_str}
-[15m — Entry Timeframe]
+[1D — Entry Timeframe]
 - Price: {current_price:.4f} | RSI: {rsi:.2f} {"⚠️ OVERSOLD" if rsi < 30 else "⚠️ OVERBOUGHT" if rsi > 70 else "✅ Neutral"} | ATR: {atr:.4f}
-- EMA({params['ema_period']}): {ema:.4f} {"↑ price ABOVE EMA (bullish 15m)" if current_price > ema else "↓ price BELOW EMA (bearish 15m)"}
+- Daily EMA({params['ema_period']}): {ema:.4f} {"↑ price ABOVE EMA (bullish 1D)" if current_price > ema else "↓ price BELOW EMA (bearish 1D)"}
 - EMA Extension: {ema_distance_atr:.2f} ATR distance from EMA. {overextension_warning}
-- Regime: {market_regime} | ADX: {adx:.2f} {"⚠️ WEAK TREND — avoid new entries" if adx < 20 else "✅ TREND CONFIRMED"}
+- Regime: {market_regime} | ADX: {adx:.2f} {"⚠️ WEAK MACRO TREND" if adx < 20 else "✅ TREND CONFIRMED"}
 
-[1H — Swing Context]
-- EMA(1H): {ema_1h:.4f} {"↑ bullish 1H trend" if current_price > ema_1h > 0 else "↓ bearish 1H trend" if ema_1h > 0 else "N/A"}
-- 1H EMA Extension: {ema_1h_distance_atr:.2f} ATR
-- RSI(1H): {rsi_1h:.2f} {"⚠️ OVERSOLD 1H" if rsi_1h < 35 else "⚠️ OVERBOUGHT 1H" if rsi_1h > 65 else ""}
-
-[4H — Macro Structure]
-- EMA(4H): {macro_ema:.4f} {"↑ MACRO BULLISH (price > 4H EMA)" if macro_trend_bullish else "↓ MACRO BEARISH (price < 4H EMA)"}
-- 4H EMA Extension: {macro_ema_distance_atr:.2f} ATR
+[1W — Macro Structure]
+- EMA(1W): {macro_ema:.4f} {"↑ MACRO BULLISH (price > 1W EMA)" if macro_trend_bullish else "↓ MACRO BEARISH (price < 1W EMA)"}
+- 1W EMA Extension: {macro_ema_distance_atr:.2f} ATR
 
 [Multi-TF Alignment]
-{"✅ ALL BULLISH — 15m+1H+4H aligned UP: strong LONG confirmation" if (current_price > ema and current_price > ema_1h and macro_trend_bullish) else "🔴 ALL BEARISH — 15m+1H+4H aligned DOWN: strong SHORT confirmation" if (current_price < ema and current_price < ema_1h and not macro_trend_bullish) else "⚠️ MIXED TIMEFRAMES — DO NOT force a trade, wait for alignment or rely on strongest signal"}
+{"✅ ALL BULLISH — 1D+1W aligned UP: strong LONG confirmation" if (current_price > ema and macro_trend_bullish) else "🔴 ALL BEARISH — 1D+1W aligned DOWN: strong SHORT confirmation" if (current_price < ema and not macro_trend_bullish) else "⚠️ MIXED TIMEFRAMES — wait for macro alignment"}
 
 [EMA Cross Status (15m)]
 - Fast EMA (20): {ema_fast:.4f}
