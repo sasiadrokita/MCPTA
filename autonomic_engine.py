@@ -1995,9 +1995,9 @@ def evaluate_market_condition(symbol, current_price):
             
             overextension_warning = ""
             if is_overextended_long:
-                overextension_warning = f"⚠️ OVEREXTENDED UPWARDS: Price is +{ema_distance_atr:.2f} ATR above 15m Medium EMA! DANGER: High probability of mean-reversion pullback."
+                overextension_warning = f"⚠️ OVEREXTENDED UPWARDS: Price is +{ema_distance_atr:.2f} ATR above Daily Medium EMA! DANGER: High probability of macro mean-reversion."
             elif is_overextended_short:
-                overextension_warning = f"⚠️ OVEREXTENDED DOWNWARDS: Price is {ema_distance_atr:.2f} ATR below 15m Medium EMA! DANGER: High probability of mean-reversion pullback."
+                overextension_warning = f"⚠️ OVEREXTENDED DOWNWARDS: Price is {ema_distance_atr:.2f} ATR below Daily Medium EMA! DANGER: High probability of macro mean-reversion."
             
             if market_regime == "VOLATILE_CHOP":
                 rm_guideline = f"Market is CHOPPY. If you must trade, use a wider SL (e.g. ~{atr_ref_sl_wide:.4f} distance) and scale down."
@@ -2090,14 +2090,13 @@ TECHNICAL ANALYSIS — MACRO TIMEFRAMES:
 [Multi-TF Alignment]
 {"✅ ALL BULLISH — 1D+1W aligned UP: strong LONG confirmation" if (current_price > ema and macro_trend_bullish) else "🔴 ALL BEARISH — 1D+1W aligned DOWN: strong SHORT confirmation" if (current_price < ema and not macro_trend_bullish) else "⚠️ MIXED TIMEFRAMES — wait for macro alignment"}
 
-[EMA Cross Status (15m)]
+[EMA Cross Status (Daily)]
 - Fast EMA (20): {ema_fast:.4f}
 - Medium EMA (50): {ema_medium:.4f}
 - Macro EMA (200): {ema_macro:.4f}
 - Status: {ema_cross_status}
 
-* COUNTER-TREND SCALPING: You are PERMITTED to open a counter-trend MEAN-REVERSION trade ONLY IF the market is severely OVEREXTENDED AND you have ABSOLUTE CERTAINTY from multiple aligning indicators (e.g., SFP + strong Divergence + positive CVD/Orderflow all screaming reversal). If there is any doubt or conflicting signals, DO NOT override your Golden Rules. DO NOT set a hard Take Profit at the 15m EMA. Instead, set a very wide initial TP (8.0-16.0 ATR) and rely on the automated Trailing Stop. Be aware: the Trailing Stop activates automatically ONLY when the price reaches your Take Profit (TP), and then trails at a distance of 4.0 ATR. Until then, rely on your SL.
-* REVERSAL CONFIRMATION: If executing a pullback strategy, verify if CVD (Orderflow) confirms the rejection (e.g. positive CVD on bottom).
+* MACRO PATIENCE: Do NOT attempt to catch falling knives or short local tops. You are a Macro Fund Manager. You wait for clear Daily structural confirmation. Trailing Stops are very wide.
 
 NEXUS INTELLIGENCE:
 - Macro Bias: {nexus_state.get('macro_bias', 'NEUTRAL')} | Score: {nexus_state.get('nexus_score', 5.0)}/10
